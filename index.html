@@ -1,8 +1,179 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Public HTML</title>
-<style>body{font-family:system-ui,"Noto Sans TC",sans-serif;max-width:42rem;margin:3rem auto;padding:0 1rem;line-height:1.8}li{margin:.4rem 0}</style>
-</head><body><h1>Public HTML</h1><ul>
-<li><a href="2026100303/">2026100303</a> 技優甄審懶人包</li>
-<li><a href="2026100302/">2026100302</a> 小正（第二大腦）使用說明書</li>
-</ul></body></html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>資料分享專區</title>
+<meta name="description" content="教學、行政與學習的公開頁面整理">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --sky1: #dff3ff; --sky2: #eefaf2; --sky3: #fff8dc;
+    --ink: #1f3b3a; --muted: #5d7b79;
+    --green: #2f9e78; --green-deep: #1f7a5a; --blue: #4aa8e0; --sun: #ffd45e; --pink: #ff9eb5;
+    --card: rgba(255,255,255,.82); --line: rgba(47,158,120,.18);
+    --serif: "Noto Serif TC", "Source Han Serif TC", "Songti TC", "PMingLiU", serif;
+    --sans: "Noto Sans TC", system-ui, -apple-system, "Microsoft JhengHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink); font-family: var(--sans);
+    font-size: clamp(1.1rem, 1.6vw, 1.35rem); line-height: 1.8; overflow-x: hidden;
+    background: linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 55%, var(--sky3) 100%);
+    background-attachment: fixed;
+  }
+  /* ---------- 背景動態 ---------- */
+  .sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .sun {
+    position: absolute; top: -6rem; right: -4rem; width: 22rem; height: 22rem; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,230,140,.95) 0%, rgba(255,230,140,.35) 45%, transparent 70%);
+    animation: glow 7s ease-in-out infinite;
+  }
+  @keyframes glow { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.12); opacity: 1; } }
+  .cloud { position: absolute; background: #fff; border-radius: 99px; opacity: .85; filter: blur(.4px); animation: drift linear infinite; }
+  .cloud::before, .cloud::after { content: ""; position: absolute; background: #fff; border-radius: 50%; }
+  .cloud::before { width: 55%; height: 160%; left: 12%; top: -70%; }
+  .cloud::after { width: 40%; height: 130%; right: 14%; top: -50%; }
+  .c1 { width: 9rem; height: 2.4rem; top: 12%; left: -12rem; animation-duration: 70s; }
+  .c2 { width: 13rem; height: 3.2rem; top: 28%; left: -16rem; animation-duration: 95s; animation-delay: -30s; opacity: .7; }
+  .c3 { width: 7rem; height: 2rem; top: 55%; left: -10rem; animation-duration: 80s; animation-delay: -55s; opacity: .6; }
+  @keyframes drift { to { transform: translateX(calc(100vw + 24rem)); } }
+  .petal {
+    position: absolute; top: -2rem; width: .9rem; height: .9rem; border-radius: 0 100% 0 100%;
+    animation: fall linear infinite; opacity: .85;
+  }
+  @keyframes fall {
+    0%   { transform: translate3d(0,-2rem,0) rotate(0deg); }
+    50%  { transform: translate3d(3rem,55vh,0) rotate(200deg); }
+    100% { transform: translate3d(-2rem,110vh,0) rotate(400deg); }
+  }
+  /* ---------- 版面 ---------- */
+  main { position: relative; z-index: 1; max-width: 70rem; margin: 0 auto; padding: 0 1.25rem 4rem; }
+  .hero { min-height: 82vh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding-top: 3rem; }
+  .eyebrow {
+    display: inline-block; padding: .35rem 1.1rem; border-radius: 99px; background: var(--card);
+    border: 1px solid var(--line); color: var(--green-deep); font-weight: 700; letter-spacing: .12em;
+    font-size: .95rem; animation: rise .9s ease both;
+  }
+  h1 {
+    margin: 1.2rem 0 .4rem; font-family: var(--serif); font-weight: 900; line-height: 1.15;
+    font-size: clamp(3.4rem, 11vw, 8rem); letter-spacing: .06em;
+    background: linear-gradient(100deg, var(--green-deep), var(--blue) 55%, var(--green));
+    background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: rise 1s .15s ease both, shine 8s linear infinite;
+  }
+  @keyframes shine { to { background-position: 200% center; } }
+  .wave { width: min(26rem, 80%); height: 1.2rem; margin: 0 0 1.4rem; animation: rise 1s .3s ease both; }
+  .wave path { fill: none; stroke: var(--sun); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 600; stroke-dashoffset: 600; animation: draw 2.2s .5s ease forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .sub { margin: 0; max-width: 34rem; color: var(--muted); font-size: clamp(1.25rem, 2.4vw, 1.7rem); animation: rise 1s .45s ease both; }
+  .stats { margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; animation: rise 1s .6s ease both; }
+  .stat { display: flex; align-items: center; padding: .6rem 1.4rem; border-radius: 18px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(47,158,120,.08); }
+  .stat b { font-family: var(--serif); font-size: 2rem; color: var(--green-deep); margin-right: .3rem; }
+  .down { margin-top: 3rem; color: var(--green-deep); font-weight: 700; text-decoration: none; animation: rise 1s .8s ease both; }
+  .down span { display: inline-block; animation: bob 1.6s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+  @keyframes rise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+  h2.sec { font-family: var(--serif); font-size: clamp(2rem, 4.6vw, 3rem); margin: 0 0 1.6rem; letter-spacing: .06em; }
+  h2.sec::after { content: ""; display: block; width: 4rem; height: 6px; border-radius: 99px; margin-top: .5rem; background: linear-gradient(90deg, var(--sun), var(--pink)); }
+  .grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); }
+  .card {
+    position: relative; display: flex; flex-direction: column; gap: .6rem; padding: 1.8rem 1.8rem 1.6rem;
+    border-radius: 26px; background: var(--card); border: 1px solid var(--line); color: inherit; text-decoration: none;
+    box-shadow: 0 10px 30px rgba(47,158,120,.10); backdrop-filter: blur(6px); overflow: hidden;
+    transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s ease, border-color .35s ease;
+  }
+  .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: linear-gradient(180deg, var(--green), var(--blue)); }
+  .card:hover, .card:focus-visible { transform: translateY(-8px) rotate(-.4deg); box-shadow: 0 22px 44px rgba(47,158,120,.2); border-color: var(--green); outline: none; }
+  .date { font-weight: 700; color: var(--green-deep); letter-spacing: .08em; font-size: 1rem; }
+  .card h3 { margin: 0; font-family: var(--serif); font-size: clamp(1.6rem, 2.6vw, 2rem); line-height: 1.4; }
+  .go { margin-top: auto; padding-top: .6rem; color: var(--blue); font-weight: 700; }
+  .go i { display: inline-block; font-style: normal; transition: transform .3s ease; }
+  .card:hover .go i { transform: translateX(8px); }
+  .empty { padding: 2.5rem; text-align: center; border-radius: 26px; background: var(--card); border: 1px dashed var(--line); color: var(--muted); }
+  .js .reveal { opacity: 0; transform: translateY(32px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); transition-delay: var(--d, 0s); }
+  .js .reveal.in { opacity: 1; transform: none; }
+  .js .reveal.in:hover { transform: translateY(-8px) rotate(-.4deg); transition-delay: 0s; }
+  footer { position: relative; z-index: 1; text-align: center; padding: 2rem 1rem 3rem; color: var(--muted); font-size: 1rem; }
+  footer::before { content: "✿"; display: block; font-size: 1.6rem; color: var(--pink); margin-bottom: .4rem; animation: bob 3s ease-in-out infinite; }
+  @media (max-width: 40rem) { .hero { min-height: 74vh; } .sun { width: 14rem; height: 14rem; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .js .reveal { opacity: 1; transform: none; }
+    .wave path { stroke-dashoffset: 0; }
+    .petal, .cloud { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true">
+  <div class="sun"></div>
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+  <div id="petals"></div>
+</div>
+
+<main>
+  <section class="hero">
+    <span class="eyebrow">PUBLIC · 公開頁面</span>
+    <h1>資料分享專區</h1>
+    <svg class="wave" viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true"><path d="M4 14 C 40 2, 70 24, 106 12 S 172 2, 208 14 S 276 24, 312 12 S 372 4, 396 12"/></svg>
+    <p class="sub">教學、行政與學習的公開頁面，整理在這裡，點一下就能開啟。</p>
+    <div class="stats">
+      <div class="stat"><b>2</b>個頁面</div>
+      <div class="stat">最後更新 2026.10.03</div>
+    </div>
+    <a class="down" href="#pages">瀏覽全部頁面 <span>↓</span></a>
+  </section>
+
+  <section id="pages">
+    <h2 class="sec">最新頁面</h2>
+    <div class="grid">
+      <a class="card reveal" href="2026100303/"><span class="date">2026.10.03 · 第3份</span><h3>技優甄審懶人包</h3><span class="go">開啟 <i>→</i></span></a>
+      <a class="card reveal" href="2026100302/"><span class="date">2026.10.03 · 第2份</span><h3>小正（第二大腦）使用說明書</h3><span class="go">開啟 <i>→</i></span></a>
+    </div>
+  </section>
+</main>
+
+<footer>資料持續更新中</footer>
+
+<script>
+(function () {
+  "use strict";
+  document.documentElement.classList.add("js");
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* 飄落的花瓣與葉片 */
+  var box = document.getElementById("petals");
+  var colors = ["#ff9eb5", "#ffc2d1", "#8fd6a8", "#b8e6c4", "#ffe08a"];
+  if (!reduce) {
+    for (var i = 0; i < 16; i++) {
+      var p = document.createElement("span");
+      p.className = "petal";
+      p.style.left = (Math.random() * 100) + "%";
+      p.style.background = colors[i % colors.length];
+      p.style.width = p.style.height = (0.6 + Math.random() * 0.8) + "rem";
+      p.style.animationDuration = (12 + Math.random() * 14) + "s";
+      p.style.animationDelay = (-Math.random() * 26) + "s";
+      box.appendChild(p);
+    }
+  }
+
+  /* 捲動時依序浮現 */
+  var items = document.querySelectorAll(".reveal");
+  items.forEach(function (el, idx) { el.style.setProperty("--d", ((idx % 6) * 0.08) + "s"); });
+  if ("IntersectionObserver" in window && !reduce) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { threshold: 0.15 });
+    items.forEach(function (el) { io.observe(el); });
+  } else {
+    items.forEach(function (el) { el.classList.add("in"); });
+  }
+})();
+</script>
+</body>
+</html>
