@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第二大腦使用說明書</title>
+<style>
+  :root {
+    --bg:#f5f7f4; --card:#fff; --ink:#1d2824; --muted:#5c6b64; --line:#dde5df;
+    --accent:#1f6b52; --accent-soft:#e2f0e9; --warn:#a4481f; --warn-soft:#fbeadf;
+    --code:#eef2ee; --shadow:0 1px 2px rgba(0,0,0,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg:#131917; --card:#1b2420; --ink:#e7eee9; --muted:#9db0a6; --line:#2c3a33;
+    --accent:#6fcaa4; --accent-soft:#223329; --warn:#f0a47c; --warn-soft:#3a2a20;
+    --code:#25312b; --shadow:none;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:4.5rem; }
+  body { margin:0; background:var(--bg); color:var(--ink); line-height:1.75;
+    font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif; }
+  a { color:var(--accent); }
+  code { background:var(--code); padding:.1em .4em; border-radius:4px; font-size:.92em; font-family:ui-monospace,Consolas,monospace; }
+  .topbar { position:sticky; top:0; z-index:20; display:flex; gap:.75rem; align-items:center;
+    padding:.6rem 1rem; background:var(--card); border-bottom:1px solid var(--line); }
+  .topbar h1 { font-size:1.05rem; margin:0; flex:1; letter-spacing:.04em; }
+  button { font:inherit; cursor:pointer; color:var(--ink); background:var(--card);
+    border:1px solid var(--line); border-radius:8px; padding:.3rem .75rem; }
+  button:hover { border-color:var(--accent); }
+  .layout { display:grid; grid-template-columns:13rem minmax(0,1fr); gap:2rem;
+    max-width:70rem; margin:0 auto; padding:1.5rem 1rem 4rem; }
+  nav.toc { position:sticky; top:4.2rem; align-self:start; font-size:.95rem; }
+  nav.toc a { display:block; padding:.35rem .75rem; border-left:3px solid var(--line);
+    color:var(--muted); text-decoration:none; }
+  nav.toc a.active { border-left-color:var(--accent); color:var(--accent); font-weight:600; background:var(--accent-soft); }
+  section { margin-bottom:3rem; }
+  h2 { font-size:1.45rem; margin:0 0 .25rem; }
+  .lead { color:var(--muted); margin:0 0 1.25rem; }
+  h3 { font-size:1.1rem; margin:1.5rem 0 .5rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:1rem 1.25rem; box-shadow:var(--shadow); }
+  .grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); }
+  .card h4 { margin:.1rem 0 .3rem; font-size:1rem; }
+  .card p { margin:.2rem 0; color:var(--muted); font-size:.95rem; }
+  .tag { display:inline-block; font-size:.78rem; padding:.05rem .55rem; border-radius:99px;
+    background:var(--accent-soft); color:var(--accent); margin-right:.3rem; }
+  .callout { border-left:4px solid var(--accent); background:var(--accent-soft); padding:.75rem 1rem; border-radius:0 8px 8px 0; margin:1rem 0; }
+  .callout.warn { border-left-color:var(--warn); background:var(--warn-soft); }
+  .steps { counter-reset:s; list-style:none; padding:0; margin:0; }
+  .steps li { counter-increment:s; position:relative; padding:.6rem 0 .6rem 2.6rem; border-bottom:1px dashed var(--line); }
+  .steps li:last-child { border-bottom:0; }
+  .steps li::before { content:counter(s); position:absolute; left:0; top:.55rem; width:1.8rem; height:1.8rem;
+    border-radius:50%; background:var(--accent); color:var(--card); text-align:center; line-height:1.8rem; font-weight:700; font-size:.9rem; }
+  /* folder tree */
+  .tree { list-style:none; margin:0; padding:0; }
+  .tree ul { list-style:none; margin:0 0 0 1.1rem; padding-left:.8rem; border-left:1px solid var(--line); display:none; }
+  .tree li.open > ul { display:block; }
+  .node { display:flex; gap:.5rem; align-items:baseline; padding:.3rem .4rem; border-radius:6px; cursor:default; }
+  .node.has { cursor:pointer; }
+  .node.has:hover { background:var(--accent-soft); }
+  .node .caret { width:1rem; color:var(--muted); flex:none; transition:transform .15s; }
+  li.open > .node .caret { transform:rotate(90deg); }
+  .node b { font-weight:600; white-space:nowrap; }
+  .node span.d { color:var(--muted); font-size:.92rem; }
+  /* filters + skills */
+  .toolbar { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem; align-items:center; }
+  input[type=search] { font:inherit; flex:1; min-width:12rem; padding:.45rem .8rem; border-radius:8px;
+    border:1px solid var(--line); background:var(--card); color:var(--ink); }
+  .chip { border-radius:99px; }
+  .chip.on { background:var(--accent); color:var(--card); border-color:var(--accent); }
+  .skill { display:flex; flex-direction:column; gap:.4rem; }
+  .skill .name { font-family:ui-monospace,Consolas,monospace; font-size:.85rem; color:var(--muted); }
+  .phrases { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.2rem; }
+  .phrase { font-size:.85rem; padding:.15rem .6rem; border-radius:99px; background:var(--code); border:1px solid var(--line); }
+  .phrase.copied { background:var(--accent); color:var(--card); border-color:var(--accent); }
+  .empty { color:var(--muted); padding:1rem; text-align:center; display:none; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th,td { padding:.6rem .8rem; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; font-size:.95rem; }
+  th { background:var(--accent-soft); color:var(--accent); }
+  tr:last-child td { border-bottom:0; }
+  details { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:.6rem 1rem; margin-bottom:.6rem; }
+  summary { cursor:pointer; font-weight:600; }
+  details p { margin:.5rem 0 .2rem; color:var(--muted); }
+  .flow { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .flow span.box { padding:.4rem .8rem; border-radius:8px; background:var(--card); border:1px solid var(--line); }
+  .flow span.arrow { color:var(--muted); }
+  footer { color:var(--muted); font-size:.9rem; text-align:center; padding:1rem; }
+  @media (max-width:50rem) {
+    .layout { grid-template-columns:minmax(0,1fr); }
+    nav.toc { position:static; display:flex; gap:.4rem; overflow-x:auto; padding-bottom:.3rem; }
+    nav.toc a { border-left:0; border-bottom:3px solid var(--line); white-space:nowrap; }
+    nav.toc a.active { border-bottom-color:var(--accent); }
+  }
+  @media print { .topbar, nav.toc, .toolbar button { display:none; } .tree ul { display:block; } .layout { display:block; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🧠 第二大腦使用說明書</h1>
+  <button id="themeBtn" type="button" aria-label="切換深淺色">🌓 深淺色</button>
+</div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+    <a href="#overview">1. 這是什麼</a>
+    <a href="#start">2. 每天怎麼用</a>
+    <a href="#folders">3. 資料夾地圖</a>
+    <a href="#skills">4. 技能庫</a>
+    <a href="#rules">5. 規則與安全</a>
+    <a href="#tools">6. 工具與同步</a>
+    <a href="#publish">7. 公開發布</a>
+    <a href="#faq">8. 常見問題</a>
+  </nav>
+
+  <main>
+
+  <section id="overview">
+    <h2>1. 這是什麼</h2>
+    <p class="lead">一座放在你電腦上的 Obsidian 筆記庫，加上一群會讀懂它的 AI 助手。你把事情交辦下去，AI 依庫裡的規則與技能完成，並把軌跡記下來。</p>
+    <div class="grid">
+      <div class="card"><h4>儲存層</h4><p>全部是純文字 Markdown 檔，存在本機，不用封閉資料庫。任何工具都讀得懂。</p></div>
+      <div class="card"><h4>資料層</h4><p>PARA 分類加六大領域，檔案之間用 <code>[[雙向連結]]</code> 串起來，每份筆記都有 YAML 欄位。</p></div>
+      <div class="card"><h4>智慧層</h4><p>AI 當「維護工程師」：攝入整理、語意檢索、自動修復，並從你的重複工作裡長出新技能。</p></div>
+    </div>
+    <h3>誰在用這座庫</h3>
+    <p>Claude Code、Codex、Antigravity 三個 AI 工具共用同一份設定。所以任何新增的記憶、規則、技能，都必須讓三者都能用，這是庫裡的最高原則。</p>
+    <div class="callout"><b>AI 開工前一定先讀：</b><code>AGENTS.md</code>，再讀 <code>90_Core/</code> 裡的檔案。你不用每次提醒。</div>
+  </section>
+
+  <section id="start">
+    <h2>2. 每天怎麼用</h2>
+    <p class="lead">不用記指令，用平常說話的方式交辦即可。以下是最常見的節奏。</p>
+    <div class="card">
+      <ol class="steps">
+        <li><b>開工：</b>說「開工」或輸入 <code>/today</code>，AI 建立今天的日誌 <code>50_Daily/YYYY-MM-DD.md</code>，並把前一份沒做完的待辦帶進來。</li>
+        <li><b>丟資料：</b>臨時想法、名單、逐字稿、剪藏，直接丟進 <code>00_Inbox/</code>，再說「幫我清洗 Inbox 並歸檔」。</li>
+        <li><b>交辦事情：</b>用自然語言說，例如「幫我整理成 LINE 公告」「幫我寫一份簽」。AI 會自動挑對應的技能。</li>
+        <li><b>記想法：</b>以「閃念：」開頭說出來，AI 存成閃念卡片，之後再慢慢升級成永久卡片。</li>
+        <li><b>收工前：</b>AI 已經把今天交辦的事寫進日誌。需要時按下方「同步」把變更推到 GitHub。</li>
+        <li><b>每週六：</b>週復盤。AI 掃過去 7 天的日誌，把重複 3 次以上的工作提議做成技能。</li>
+      </ol>
+    </div>
+    <h3>一件事怎麼流動</h3>
+    <div class="flow">
+      <span class="box">你說一句話</span><span class="arrow">→</span>
+      <span class="box">AI 讀 AGENTS.md 與 90_Core</span><span class="arrow">→</span>
+      <span class="box">挑技能執行</span><span class="arrow">→</span>
+      <span class="box">成品放到規定位置</span><span class="arrow">→</span>
+      <span class="box">寫入當日日誌與 log.md</span>
+    </div>
+    <div class="callout warn"><b>資訊不全時，AI 會先問，不會猜。</b>時間、地點、數據、文號、人名一律不編造。</div>
+  </section>
+
+  <section id="folders">
+    <h2>3. 資料夾地圖</h2>
+    <p class="lead">點資料夾可以展開。成品要放哪裡，在這裡一眼就能找到。</p>
+    <div class="toolbar">
+      <button type="button" id="expandAll">全部展開</button>
+      <button type="button" id="collapseAll">全部收合</button>
+    </div>
+    <div class="card"><ul class="tree" id="tree"></ul></div>
+  </section>
+
+  <section id="skills">
+    <h2>4. 技能庫</h2>
+    <p class="lead">共 <b id="skillCount">0</b> 個技能。技能是「某類工作的標準作業流程」，說出觸發語就會啟動。點觸發語可以複製。</p>
+    <div class="toolbar">
+      <input type="search" id="skillSearch" placeholder="搜尋技能名稱、用途或觸發語…">
+    </div>
+    <div class="toolbar" id="chips"></div>
+    <div class="grid" id="skillGrid"></div>
+    <p class="empty" id="skillEmpty">沒有符合的技能。</p>
+    <div class="callout"><b>技能放在兩個地方：</b><code>.agents/skills/</code>（Codex、Antigravity 讀）與 <code>.claude/skills/</code>（Claude 讀），內容必須一致。改完後用 <code>sync-claude-skills.bat</code> 單向同步。</div>
+  </section>
+
+  <section id="rules">
+    <h2>5. 規則與安全</h2>
+    <p class="lead">全部寫在 <code>90_Core/</code>，AI 開工前先讀。</p>
+    <table>
+      <thead><tr><th>檔案</th><th>內容</th></tr></thead>
+      <tbody>
+        <tr><td><code>profile.md</code></td><td>你的身分、職務、常用工具、協作偏好、隱私界線</td></tr>
+        <tr><td><code>style-guide.md</code></td><td>用語風格、稱謂，以及公文、LINE 公告、教案、Obsidian 筆記的寫法</td></tr>
+        <tr><td><code>rules.md</code></td><td>跨 Agent 原則、自動進化機制、檔案維護與紅線</td></tr>
+        <tr><td><code>parameters.md</code></td><td>重要參數（網址等），每個有唯一編號 <code>PRM-領域-NNN</code>；技能只寫編號，不寫值</td></tr>
+        <tr><td><code>publish-rules.md</code></td><td>公開發布 HTML 的流程、資料夾命名、公開前檢查</td></tr>
+      </tbody>
+    </table>
+    <h3>必須遵守的安全守則</h3>
+    <div class="grid">
+      <div class="card"><h4>不直接刪除</h4><p>廢棄內容只能移到 <code>40_Archives/</code>。要刪檔先經你同意。</p></div>
+      <div class="card"><h4>個資代號化</h4><p>學生寫「甲生」「座號 01」，教師寫「A 師」。不寫身分證、住址、電話、家長帳戶。</p></div>
+      <div class="card"><h4>金鑰不入檔</h4><p>API Key、Token、密碼一律用環境變數，不寫進任何檔案。</p></div>
+      <div class="card"><h4>不可逆先確認</h4><p>刪除、覆蓋、發送、<code>DROP</code>／<code>TRUNCATE</code> 等操作，先問你。</p></div>
+      <div class="card"><h4>紅線事件</h4><p>性平／兒少事件 24 小時內通報；利益迴避；不利處分要給陳述意見並附救濟教示。</p></div>
+      <div class="card"><h4>三工具相容</h4><p>新規則寫成 <code>90_Core/</code> 獨立檔並在 <code>AGENTS.md</code> 登記；不用單一工具專屬語法。</p></div>
+    </div>
+    <h3>成品放哪裡</h3>
+    <table>
+      <thead><tr><th>成品</th><th>位置</th></tr></thead>
+      <tbody>
+        <tr><td>公文（簽、函、公告、開會通知單）</td><td><code>20_Areas/行政業務/01_公文/</code>，檔名 <code>類別_日期或學年度_主旨.md</code></td></tr>
+        <tr><td>會議資料</td><td><code>20_Areas/行政業務/02_會議/YYYYMMDD_會議名稱/</code></td></tr>
+        <tr><td>卡片筆記</td><td><code>30_Resources/卡片筆記/</code> 底下對應編號資料夾</td></tr>
+        <tr><td>課程</td><td><code>20_Areas/課程管理/</code></td></tr>
+        <tr><td>專案</td><td><code>10_Projects/</code></td></tr>
+        <tr><td>本機雙擊工具</td><td><code>70_Script/</code>，並登記於其 README</td></tr>
+        <tr><td>草稿、無明確歸屬</td><td><code>00_Inbox/</code>，AI 會提醒你歸類</td></tr>
+        <tr><td>結案或過期</td><td><code>40_Archives/</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="tools">
+    <h2>6. 工具與同步</h2>
+    <p class="lead">放在 <code>70_Script/</code>，在 PowerShell 裡進入該資料夾，用 <code>.\名稱.bat</code> 執行；也可以直接雙擊。AI 只負責寫，執行由你在本機進行。</p>
+    <div class="grid">
+      <div class="card"><h4>git-sync</h4><p>第一次執行會初始化 git 並連到私人 GitHub 倉庫；之後列出變更，按 Enter 確認即推送。加 <code>-DryRun</code> 只列出不動作。</p></div>
+      <div class="card"><h4>sync-claude-skills</h4><p>把 <code>.agents/skills</code> 單向同步到 <code>.claude/skills</code>。先列差異、確認才複製、舊檔備份到 <code>40_Archives/skill-sync-backup/</code>。</p></div>
+      <div class="card"><h4>publish-html</h4><p>把 <code>80_Publish/</code> 的頁面推送到公開倉庫，詳見下一節。</p></div>
+    </div>
+    <div class="callout">這些工具都<b>不刪檔</b>，覆蓋前會先列清單並備份。參數 <code>-DryRun</code> 只列出、<code>-Yes</code> 略過詢問。</div>
+    <h3>日誌與紀錄</h3>
+    <p><code>50_Daily/</code> 記每天交辦的事；<code>log.md</code> 記設定、規則、工具的異動；<code>index.md</code> 是全庫地圖。AI 會自動維護這三者。</p>
+  </section>
+
+  <section id="publish">
+    <h2>7. 公開發布</h2>
+    <p class="lead">想把 AI 做的 HTML 放上公開網頁時，走這條流程。</p>
+    <div class="card">
+      <ol class="steps">
+        <li>請 AI 製作頁面。草稿先放 <code>00_Inbox/</code>。</li>
+        <li>AI 依 <code>publish-rules.md</code> 做公開前檢查：真實姓名中間字換成 <code>○</code>；班級、座號、市內電話可公開；手機只留前 4 碼其餘為 <code>X</code>；沒有內部網址、帳密、未公告事項。</li>
+        <li>你確認可公開後，AI 建立 <code>80_Publish/YYYYMMDDNN/</code>（<code>NN</code> 是當天流水號，01 起算），主檔叫 <code>index.html</code>，圖片等放同一資料夾，並登記在 <code>publish-log.md</code>。</li>
+        <li>執行 <code>publish-html.bat</code> 推送，或請 AI 直接推送。</li>
+        <li>網址是 <code>公開網站網址 + 資料夾名稱 + /</code>，網站網址記在 <code>PRM-GIT-003</code>。</li>
+      </ol>
+    </div>
+    <div class="callout warn"><b>撤下頁面：</b>不是直接刪除。整個資料夾移到 <code>40_Archives/published-html/</code>，在 <code>publish-log.md</code> 標註已撤下，並同步移除公開倉庫裡的資料夾。已用過的編號不重用。</div>
+  </section>
+
+  <section id="faq">
+    <h2>8. 常見問題</h2>
+    <details><summary>AI 沒照規則做怎麼辦？</summary><p>先確認它有讀 <code>AGENTS.md</code> 與 <code>90_Core/</code>，沒有就請它重新讀。仍有問題，到對應檔案修規則，不要只在對話裡口頭交代。</p></details>
+    <details><summary>怎麼新增一個全域規則？</summary><p>寫成 <code>90_Core/</code> 裡的獨立 Markdown，再到 <code>AGENTS.md</code> 第 0 節加說明與 <code>@</code> 引用。這樣三個 AI 工具都讀得到。</p></details>
+    <details><summary>怎麼新增一個技能？</summary><p>說「提煉技能」讓 AI 從重複的工作長出來，或用「專案包建造器」一步步做。技能要同時放 <code>.agents/skills/</code> 與 <code>.claude/skills/</code>。</p></details>
+    <details><summary>重複的工作會自動變成技能嗎？</summary><p>不會自動。7 天內同類工作重複 3 次以上，AI 會在總結時提議，你同意才建立。你拒絕的提議不會再提。</p></details>
+    <details><summary>在 PowerShell 執行 .bat 說找不到？</summary><p>要加 <code>.\</code>，例如 <code>.\git-sync.bat</code>。PowerShell 預設不從目前位置載入指令。</p></details>
+    <details><summary>可以讓 AI 直接推送到 GitHub 嗎？</summary><p>可以，前提是你在 claude.ai 連結了 GitHub 並授權該倉庫。日常同步私人庫仍建議雙擊 <code>git-sync.bat</code>。</p></details>
+    <details><summary>放在 GitHub 的私人庫裡有個資怎麼辦？</summary><p>倉庫務必設成 Private。庫內已規定個資代號化、金鑰不入檔；公開倉庫只放通過公開檢查的成品。</p></details>
+    <details><summary>改了檔案要不要更新 YAML？</summary><p>要。修改時保留並更新頂部的 <code>tags</code>、<code>date</code>、<code>updated</code>、<code>type</code>。</p></details>
+  </section>
+
+  </main>
+</div>
+
+<footer>第二大腦使用說明書 · 依 2026-10-03 的庫內設定整理 · 設定更新後請重新產生</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- 深淺色 ---------- */
+  var root = document.documentElement;
+  try { var saved = localStorage.getItem("sb-theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+  if (!root.getAttribute("data-theme") && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) {
+    root.setAttribute("data-theme", "dark");
+  }
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("sb-theme", next); } catch (e) {}
+  });
+
+  /* ---------- 資料夾地圖 ---------- */
+  var tree = [
+    { n: "AGENTS.md", d: "所有 AI 的總綱：開工前必讀、架構、安全守則" },
+    { n: "index.md", d: "全庫地圖（MOC），由 AI 維護" },
+    { n: "log.md", d: "設定、規則、工具異動的日誌" },
+    { n: "90_Core/", d: "核心記憶與全域規則，AI 開工前必讀", c: [
+      { n: "profile.md", d: "身分與工作背景" },
+      { n: "style-guide.md", d: "用語風格與各類文件寫法" },
+      { n: "rules.md", d: "全域規則完整版" },
+      { n: "parameters.md", d: "重要參數與編號 PRM-領域-NNN" },
+      { n: "publish-rules.md", d: "公開發布規則" } ] },
+    { n: "00_Inbox/", d: "零阻力速記區：未整理的資料、草稿都先放這裡" },
+    { n: "10_Projects/", d: "專案區：程式專案與教學專案", c: [
+      { n: "Dev_專案範例/", d: "程式專案：架構、技術選型、ADR、Bug 覆盤" },
+      { n: "Teaching_教學專案範例/", d: "教學專案：教案、講義、評量" } ] },
+    { n: "20_Areas/", d: "責任領域", c: [
+      { n: "行政業務/", d: "行政相關成品", c: [
+        { n: "01_公文/", d: "簽、函、公告、開會通知單" },
+        { n: "02_會議/", d: "會議資料，依日期與會議名稱分資料夾" },
+        { n: "行政導師名冊.md", d: "校內人員姓名、職稱、分機與班級對照" } ] },
+      { n: "課程管理/", d: "課程大綱與課程資料" } ] },
+    { n: "30_Resources/卡片筆記/", d: "知識沉澱區（Zettelkasten）", c: [
+      { n: "01_閃念/", d: "剛冒出來的原始想法" },
+      { n: "02_文獻筆記/", d: "書籍、論文、課程的摘要與心得" },
+      { n: "03_永久卡片/", d: "一想法一卡片，連結成網" },
+      { n: "04_主題地圖/", d: "把相關卡片串成主題的入口頁" } ] },
+    { n: "40_Archives/", d: "歸檔區：結案專案、過期檔案、被撤下的頁面、被取代的舊檔" },
+    { n: "50_Daily/", d: "每日工作日誌 YYYY-MM-DD.md，記錄交辦軌跡" },
+    { n: "60_Templates/", d: "各類卡片與筆記的 YAML 範本" },
+    { n: "70_Script/", d: "本機雙擊執行的工具程式（.bat／.ps1）與其 README" },
+    { n: "80_Publish/", d: "已通過公開檢查、準備推送到公開網頁的 HTML", c: [
+      { n: "YYYYMMDDNN/", d: "每次發布一個資料夾，主檔 index.html" },
+      { n: "publish-log.md", d: "發布編號對照表（不會被公開）" } ] },
+    { n: ".agents/skills/", d: "技能庫（Codex、Antigravity 讀取）" },
+    { n: ".claude/", d: "Claude 專用位置", c: [
+      { n: "skills/", d: "技能庫（Claude 讀取，內容與 .agents/skills 相同）" },
+      { n: "commands/", d: "斜線指令，例如 /today（只有 Claude 能用）" } ] },
+    { n: ".obsidian/", d: "Obsidian 的設定檔" }
+  ];
+  var treeEl = document.getElementById("tree");
+  function build(list, parent) {
+    list.forEach(function (it) {
+      var li = document.createElement("li");
+      var row = document.createElement("div");
+      row.className = "node" + (it.c ? " has" : "");
+      var caret = document.createElement("span");
+      caret.className = "caret"; caret.textContent = it.c ? "▸" : "·";
+      var b = document.createElement("b"); b.textContent = it.n;
+      var d = document.createElement("span"); d.className = "d"; d.textContent = it.d;
+      row.appendChild(caret); row.appendChild(b); row.appendChild(d);
+      li.appendChild(row);
+      if (it.c) {
+        var ul = document.createElement("ul"); build(it.c, ul); li.appendChild(ul);
+        row.addEventListener("click", function () { li.classList.toggle("open"); });
+      }
+      parent.appendChild(li);
+    });
+  }
+  build(tree, treeEl);
+  function setAll(open) {
+    treeEl.querySelectorAll("li").forEach(function (li) {
+      if (li.querySelector(":scope > ul")) li.classList.toggle("open", open);
+    });
+  }
+  document.getElementById("expandAll").addEventListener("click", function () { setAll(true); });
+  document.getElementById("collapseAll").addEventListener("click", function () { setAll(false); });
+  treeEl.querySelectorAll(":scope > li").forEach(function (li) {
+    if (li.querySelector(":scope > ul") && /90_Core|20_Areas/.test(li.textContent.slice(0, 12))) li.classList.add("open");
+  });
+
+  /* ---------- 技能庫 ---------- */
+  var skills = [
+    ["today", "日常維運", "建立今日日誌", "建立今天的 Daily Note，並從最近一份日誌帶入未完成的待辦。", ["開工", "/today", "建立今天的日誌"]],
+    ["zettelkasten", "日常維運", "卡片筆記", "整理閃念、文獻筆記，建立永久卡片與主題地圖，檢查與連結卡片。", ["閃念：", "語音筆記：", "隨手記：", "幫我記錄這段想法"]],
+    ["skill-extractor", "日常維運", "每週復盤", "掃描近 7 天日誌，找出重複的工作，提議封裝成技能、寫進規則或改進既有技能。", ["週復盤", "提煉技能", "有哪些工作可以做成技能"]],
+    ["line-announcement-formatter", "行政公文", "LINE 公告整理", "把口述或雜亂的記錄整理成可直接貼到 LINE 或社群群組的公告，不用 Markdown 符號。", ["幫我整理成公告", "整理重點貼到 LINE 群組", "這段話幫我弄工整發出去"]],
+    ["meeting-materials", "行政公文", "會議資料彙整", "籌辦校務會議、行政會報、主管會議：確認要件、收資料、彙整成 Word 與 PDF、做發言小卡與時程表。", ["幫我收會議資料", "準備行政會報資料", "做發言小卡"]],
+    ["meeting-notice-to-calendar", "行政公文", "開會通知轉行事曆", "把開會通知單（照片或文字）轉成 Google 行事曆事件；資訊有缺漏會先問，預覽確認後才建立。", ["加到行事曆", "排進日曆", "幫我建立行程"]],
+    ["patrol-report", "行政公文", "巡堂紀錄整理", "整理每日巡堂紀錄，產出年級群組公告、給導師的私訊與每週週報。", ["整理巡堂日報", "巡堂週報", "把巡堂紀錄分流"]],
+    ["tw-formal-writing", "行政公文", "台灣正式文件", "撰寫公文、其他政府文件、法律文件、人民對政府文書，附規範與用語對照。", ["幫我寫一份簽", "幫我擬一份函", "幫我寫陳情書"]],
+    ["wg-awareness-journal", "思考引擎", "思考覺察日記", "對話式日記，用白話問句陪你看清卡住的事，收尾給一張「給未來的我」小紙條。", ["請開啟思考覺察日記", "我心裡有件事卡住了", "我想整理一下今天"]],
+    ["wg-conversation-dojo", "思考引擎", "對話陪練室", "準備、復盤難講的對話，預測對方反應，產出對話腳本骨架。", ["開啟對話陪練室", "幫我準備一場難講的對話", "昨天那場對話我想復盤"]],
+    ["wg-decision-engine", "思考引擎", "決策分析引擎", "依方案數用 SWOT、加權矩陣或 Pugh Matrix 分析，產出不到一頁的決策摘要與反方挑戰。", ["開啟決策分析引擎", "我在 A 和 B 之間選不出來", "這兩個選項幫我比較一下"]],
+    ["wg-fact-check-engine", "思考引擎", "事實查證引擎", "查證文章中的引用、數據、人名、法條、日期，揪出 AI 幻覺與張冠李戴。", ["幫我查證事實", "這篇有沒有 AI 幻覺", "請開啟查證引擎"]],
+    ["wg-insight-engine", "思考引擎", "洞見引擎", "蘇格拉底式追問，把說不清楚的直覺挖成核心洞見與金句。", ["開啟洞見引擎", "幫我找出我真正想說的是什麼"]],
+    ["wg-learning-notes", "思考引擎", "學習筆記", "把書、課程、逐字稿做成一則一則獨立的卡片盒筆記，融入你自己的經驗。", ["開啟學習筆記", "幫我把這本書做成卡片"]],
+    ["wg-perspective-engine", "思考引擎", "觀點作品引擎", "用 4P 校準、觀點挖掘到文體變形，把觀點寫成文章、Email、企劃書或提案。", ["開啟觀點作品引擎", "幫我把這個想法寫成一篇文章"]],
+    ["wg-presentation-skeleton", "思考引擎", "簡報骨架引擎", "設計簡報結構，產出藍圖、逐字稿與可餵給 Gamma、Canva 的投影片大綱。", ["開啟簡報骨架引擎", "幫我設計一場簡報"]],
+    ["wg-project-kit-builder", "思考引擎", "專案包建造器", "一步步把重複任務做成專屬專案包或技能，並推薦經典方法論。", ["請開啟專案包建造器", "我要打造一個新的 skill"]],
+    ["wg-story-incubator", "思考引擎", "故事孵化引擎", "用七階段流程把真實經歷寫成故事，全程不編造情節。", ["開啟故事孵化引擎", "幫我把這段經歷寫成故事"]],
+    ["wg-strategy-engine", "思考引擎", "策略規劃引擎", "用 SMART、OKR、PDCA 把目標拆成計畫、時間軸與本週三件事。", ["開啟策略規劃引擎", "幫我排時間軸和 PDCA"]],
+    ["wg-think-tank", "思考引擎", "智囊團", "召集十位不同立場的顧問，輪番發言，產出盲點地圖。", ["開啟智囊團", "這個想法有什麼盲點"]],
+    ["wg-writing-style-extractor", "思考引擎", "寫作風格萃取器", "分析你的文章，產出個人風格改寫指南（Markdown 或 Skill 格式）。", ["開啟寫作風格萃取器", "萃取我的語氣指紋"]]
+  ];
+  var cats = ["全部"].concat(skills.reduce(function (a, s) { if (a.indexOf(s[1]) < 0) a.push(s[1]); return a; }, []));
+  var current = "全部";
+  var grid = document.getElementById("skillGrid");
+  var chips = document.getElementById("chips");
+  var q = document.getElementById("skillSearch");
+  document.getElementById("skillCount").textContent = skills.length;
+
+  function flash(el) {
+    el.classList.add("copied");
+    var old = el.textContent; el.textContent = "已複製";
+    setTimeout(function () { el.classList.remove("copied"); el.textContent = old; }, 900);
+  }
+  function copyText(text, el) {
+    function done() { flash(el); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text); done(); });
+    } else { fallback(text); done(); }
+  }
+  function fallback(text) {
+    var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(ta);
+  }
+
+  cats.forEach(function (c) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "chip" + (c === "全部" ? " on" : ""); b.textContent = c;
+    b.addEventListener("click", function () {
+      current = c;
+      chips.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === b); });
+      render();
+    });
+    chips.appendChild(b);
+  });
+
+  function render() {
+    var kw = q.value.trim().toLowerCase();
+    grid.innerHTML = "";
+    var shown = 0;
+    skills.forEach(function (s) {
+      if (current !== "全部" && s[1] !== current) return;
+      var hay = (s[0] + s[1] + s[2] + s[3] + s[4].join("")).toLowerCase();
+      if (kw && hay.indexOf(kw) < 0) return;
+      shown++;
+      var card = document.createElement("div"); card.className = "card skill";
+      var tag = document.createElement("div");
+      var t = document.createElement("span"); t.className = "tag"; t.textContent = s[1]; tag.appendChild(t);
+      var h = document.createElement("h4"); h.textContent = s[2];
+      var nm = document.createElement("div"); nm.className = "name"; nm.textContent = s[0];
+      var p = document.createElement("p"); p.textContent = s[3];
+      var ph = document.createElement("div"); ph.className = "phrases";
+      s[4].forEach(function (x) {
+        var b = document.createElement("button"); b.type = "button"; b.className = "phrase"; b.textContent = x;
+        b.title = "點一下複製";
+        b.addEventListener("click", function () { copyText(x, b); });
+        ph.appendChild(b);
+      });
+      card.appendChild(tag); card.appendChild(h); card.appendChild(nm); card.appendChild(p); card.appendChild(ph);
+      grid.appendChild(card);
+    });
+    document.getElementById("skillEmpty").style.display = shown ? "none" : "block";
+  }
+  q.addEventListener("input", render);
+  render();
+
+  /* ---------- 目錄高亮 ---------- */
+  var links = Array.prototype.slice.call(document.querySelectorAll("#toc a"));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute("href")); });
+  function spy() {
+    var y = window.scrollY + 120, idx = 0;
+    secs.forEach(function (s, i) { if (s && s.offsetTop <= y) idx = i; });
+    links.forEach(function (a, i) { a.classList.toggle("active", i === idx); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>
