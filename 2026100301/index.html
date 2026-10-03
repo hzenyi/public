@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>教務處同仁名冊</title>
+<style>
+  :root {
+    --bg: #f6f7f4; --card: #ffffff; --ink: #1f2a26; --muted: #5d6b64;
+    --line: #dfe5df; --accent: #1f6b52; --accent-soft: #e3f1ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151b18; --card: #1d2622; --ink: #e8eee9; --muted: #9fb0a7;
+      --line: #2e3b35; --accent: #6fcaa4; --accent-soft: #23372e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    line-height: 1.7;
+  }
+  main { max-width: 52rem; margin: 0 auto; padding: 2.5rem 1rem 3rem; }
+  header { margin-bottom: 1.5rem; }
+  h1 { margin: 0 0 .25rem; font-size: 1.75rem; letter-spacing: .04em; }
+  .sub { margin: 0; color: var(--muted); }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: .85rem 1rem; text-align: left; vertical-align: top; }
+  thead th {
+    background: var(--accent-soft); color: var(--accent);
+    font-size: .9rem; letter-spacing: .06em;
+  }
+  tbody tr + tr td { border-top: 1px solid var(--line); }
+  td.role { font-weight: 600; white-space: nowrap; }
+  td.ext { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .lead td { background: color-mix(in srgb, var(--accent-soft) 45%, var(--card)); }
+  .note { color: var(--muted); font-size: .9rem; }
+  footer { margin-top: 1.25rem; color: var(--muted); font-size: .9rem; }
+  footer p { margin: .3rem 0; }
+  @media (max-width: 36rem) {
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tr { padding: .75rem 1rem; }
+    tbody tr + tr { border-top: 1px solid var(--line); }
+    tbody tr + tr td { border-top: 0; }
+    td { padding: .1rem 0; }
+    td.role { font-size: 1.05rem; }
+    td[data-label]::before { content: attr(data-label) "　"; color: var(--muted); font-size: .85rem; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>教務處同仁名冊</h1>
+    <p class="sub">國立彰化師範大學附屬高級工業職業學校</p>
+  </header>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>職稱</th><th>姓名</th><th>分機</th><th>備註</th></tr>
+      </thead>
+      <tbody>
+        <tr class="lead">
+          <td class="role">教務主任</td>
+          <td data-label="姓名">黃○誼</td>
+          <td class="ext" data-label="分機">270</td>
+          <td class="note">專線／傳真 7248148</td>
+        </tr>
+        <tr>
+          <td class="role">教學組長</td>
+          <td data-label="姓名">陳○萍</td>
+          <td class="ext" data-label="分機">223</td>
+          <td class="note"></td>
+        </tr>
+        <tr>
+          <td class="role">註冊組長</td>
+          <td data-label="姓名">賴○東</td>
+          <td class="ext" data-label="分機">206</td>
+          <td class="note"></td>
+        </tr>
+        <tr>
+          <td class="role">設備組長</td>
+          <td data-label="姓名">陳○誠</td>
+          <td class="ext" data-label="分機">253</td>
+          <td class="note">專線／傳真 7285507</td>
+        </tr>
+        <tr>
+          <td class="role">課務組長</td>
+          <td data-label="姓名">林○真</td>
+          <td class="ext" data-label="分機">272</td>
+          <td class="note">與實驗研究組共用分機</td>
+        </tr>
+        <tr>
+          <td class="role">實驗研究組長</td>
+          <td data-label="姓名">潘○軒</td>
+          <td class="ext" data-label="分機">272</td>
+          <td class="note">與課務組共用分機</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p>姓名中間一字以「○」遮蔽。</p>
+    <p>資料更新日：2026 年 10 月 3 日</p>
+  </footer>
+</main>
+</body>
+</html>
