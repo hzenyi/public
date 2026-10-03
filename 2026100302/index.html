@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>第二大腦使用說明書</title>
+<title>小正（第二大腦）使用說明書</title>
 <style>
   :root {
     --bg:#f5f7f4; --card:#fff; --ink:#1d2824; --muted:#5c6b64; --line:#dde5df;
@@ -97,7 +97,7 @@
 <body>
 
 <div class="topbar">
-  <h1>🧠 第二大腦使用說明書</h1>
+  <h1>🧠 小正（第二大腦）使用說明書</h1>
   <button id="themeBtn" type="button" aria-label="切換深淺色">🌓 深淺色</button>
 </div>
 
@@ -117,7 +117,8 @@
 
   <section id="overview">
     <h2>1. 這是什麼</h2>
-    <p class="lead">一座放在你電腦上的 Obsidian 筆記庫，加上一群會讀懂它的 AI 助手。你把事情交辦下去，AI 依庫裡的規則與技能完成，並把軌跡記下來。</p>
+    <p class="lead">一座放在你電腦上的 Obsidian 筆記庫，加上一群會讀懂它的 AI 助手。你把事情交辦下去，AI 依庫裡的規則與技能完成，並把軌跡記下來。這個系統的名字叫「<b>小正</b>」。</p>
+    <div class="callout"><b>關於「小正」：</b>小正是這座第二大腦的名字，指筆記庫、規則、技能，以及在庫裡替你工作的 AI 助理（不分 Claude、Codex 或 Antigravity）。可以直接說「小正，開工」「請小正幫我整理成公告」。小正是助理，不是真人，也不是某個模型的名稱；取名不改變任何規則，不編造、資訊不全先問、個資代號化、不可逆動作先確認。規則寫在 <code>90_Core/identity.md</code>。</div>
     <div class="grid">
       <div class="card"><h4>儲存層</h4><p>全部是純文字 Markdown 檔，存在本機，不用封閉資料庫。任何工具都讀得懂。</p></div>
       <div class="card"><h4>資料層</h4><p>PARA 分類加六大領域，檔案之間用 <code>[[雙向連結]]</code> 串起來，每份筆記都有 YAML 欄位。</p></div>
@@ -125,7 +126,7 @@
     </div>
     <h3>誰在用這座庫</h3>
     <p>Claude Code、Codex、Antigravity 三個 AI 工具共用同一份設定。所以任何新增的記憶、規則、技能，都必須讓三者都能用，這是庫裡的最高原則。</p>
-    <div class="callout"><b>AI 開工前一定先讀：</b><code>AGENTS.md</code>，再讀 <code>90_Core/</code> 裡的檔案。你不用每次提醒。</div>
+    <div class="callout"><b>AI 開工前一定先讀：</b><code>AGENTS.md</code>，再讀 <code>90_Core/</code> 裡的全部設定檔（身分、風格、規則、參數、公開發布規則、小正的名字）。你不用每次提醒。</div>
   </section>
 
   <section id="start">
@@ -133,11 +134,11 @@
     <p class="lead">不用記指令，用平常說話的方式交辦即可。以下是最常見的節奏。</p>
     <div class="card">
       <ol class="steps">
-        <li><b>開工：</b>說「開工」或輸入 <code>/today</code>，AI 建立今天的日誌 <code>50_Daily/YYYY-MM-DD.md</code>，並把前一份沒做完的待辦帶進來。</li>
+        <li><b>開工：</b>說「小正，開工」或輸入 <code>/today</code>，AI 建立今天的日誌 <code>50_Daily/YYYY-MM-DD.md</code>，並把前一份沒做完的待辦帶進來。</li>
         <li><b>丟資料：</b>臨時想法、名單、逐字稿、剪藏，直接丟進 <code>00_Inbox/</code>，再說「幫我清洗 Inbox 並歸檔」。</li>
         <li><b>交辦事情：</b>用自然語言說，例如「幫我整理成 LINE 公告」「幫我寫一份簽」。AI 會自動挑對應的技能。</li>
         <li><b>記想法：</b>以「閃念：」開頭說出來，AI 存成閃念卡片，之後再慢慢升級成永久卡片。</li>
-        <li><b>收工前：</b>AI 已經把今天交辦的事寫進日誌。需要時按下方「同步」把變更推到 GitHub。</li>
+        <li><b>收工前：</b>AI 已經把今天交辦的事寫進日誌。需要時雙擊 <code>git-sync.bat</code>，把變更同步到 GitHub。</li>
         <li><b>每週六：</b>週復盤。AI 掃過去 7 天的日誌，把重複 3 次以上的工作提議做成技能。</li>
       </ol>
     </div>
@@ -185,6 +186,7 @@
         <tr><td><code>rules.md</code></td><td>跨 Agent 原則、自動進化機制、檔案維護與紅線</td></tr>
         <tr><td><code>parameters.md</code></td><td>重要參數（網址等），每個有唯一編號 <code>PRM-領域-NNN</code>；技能只寫編號，不寫值</td></tr>
         <tr><td><code>publish-rules.md</code></td><td>公開發布 HTML 的流程、資料夾命名、公開前檢查</td></tr>
+        <tr><td><code>identity.md</code></td><td>第二大腦的名字「小正」：稱呼、使用方式與不變的原則</td></tr>
       </tbody>
     </table>
     <h3>必須遵守的安全守則</h3>
@@ -219,8 +221,11 @@
       <div class="card"><h4>git-sync</h4><p>第一次執行會初始化 git 並連到私人 GitHub 倉庫；之後列出變更，按 Enter 確認即推送。加 <code>-DryRun</code> 只列出不動作。</p></div>
       <div class="card"><h4>sync-claude-skills</h4><p>把 <code>.agents/skills</code> 單向同步到 <code>.claude/skills</code>。先列差異、確認才複製、舊檔備份到 <code>40_Archives/skill-sync-backup/</code>。</p></div>
       <div class="card"><h4>publish-html</h4><p>把 <code>80_Publish/</code> 的頁面推送到公開倉庫，詳見下一節。</p></div>
+      <div class="card"><h4>外部連結（Connectors）</h4><p>在 claude.ai 連結你的帳號後，小正可以讀寫 Google 行事曆（新增、修改、刪除前會先請你確認），也可以在授權後直接推送 GitHub。</p></div>
     </div>
     <div class="callout">這些工具都<b>不刪檔</b>，覆蓋前會先列清單並備份。參數 <code>-DryRun</code> 只列出、<code>-Yes</code> 略過詢問。</div>
+    <h3>同步到 GitHub 與在另一台電腦使用</h3>
+    <p>私人庫放在 GitHub 的 Private 倉庫。日常雙擊 <code>git-sync.bat</code> 同步（提示直接按 Enter 即確認）。在另一台電腦用 <code>git clone</code> 複製下來、用 Obsidian 開啟、把資料夾連給 AI 工具，就能得到同一個小正；密碼與金鑰不放在庫裡，要在新電腦另外設定。</p>
     <h3>日誌與紀錄</h3>
     <p><code>50_Daily/</code> 記每天交辦的事；<code>log.md</code> 記設定、規則、工具的異動；<code>index.md</code> 是全庫地圖。AI 會自動維護這三者。</p>
   </section>
@@ -232,11 +237,12 @@
       <ol class="steps">
         <li>請 AI 製作頁面。草稿先放 <code>00_Inbox/</code>。</li>
         <li>AI 依 <code>publish-rules.md</code> 做公開前檢查：真實姓名中間字換成 <code>○</code>；班級、座號、市內電話可公開；手機只留前 4 碼其餘為 <code>X</code>；沒有內部網址、帳密、未公告事項。</li>
-        <li>你確認可公開後，AI 建立 <code>80_Publish/YYYYMMDDNN/</code>（<code>NN</code> 是當天流水號，01 起算），主檔叫 <code>index.html</code>，圖片等放同一資料夾，並登記在 <code>publish-log.md</code>。</li>
+        <li>你確認可公開後，AI 建立 <code>80_Publish/YYYYMMDDNN/</code>（<code>NN</code> 是當天流水號，01 起算），主檔叫 <code>index.html</code>，圖片等放同一資料夾，並登記在 <code>publish-log.md</code>。同一份頁面修改後重新發布，沿用原資料夾，不佔新編號。</li>
         <li>執行 <code>publish-html.bat</code> 推送，或請 AI 直接推送。</li>
         <li>網址是 <code>公開網站網址 + 資料夾名稱 + /</code>，網站網址記在 <code>PRM-GIT-003</code>。</li>
       </ol>
     </div>
+    <div class="callout"><b>第一次設定公開網站：</b>在 GitHub 建立名為 <code>public</code> 的公開倉庫，到 Settings → Pages，Source 選「Deploy from a branch」，Branch 選 <code>main</code>、資料夾 <code>/ (root)</code>。公開倉庫的首頁 <code>index.html</code> 會由工具自動重建，列出所有頁面。</div>
     <div class="callout warn"><b>撤下頁面：</b>不是直接刪除。整個資料夾移到 <code>40_Archives/published-html/</code>，在 <code>publish-log.md</code> 標註已撤下，並同步移除公開倉庫裡的資料夾。已用過的編號不重用。</div>
   </section>
 
@@ -249,13 +255,15 @@
     <details><summary>在 PowerShell 執行 .bat 說找不到？</summary><p>要加 <code>.\</code>，例如 <code>.\git-sync.bat</code>。PowerShell 預設不從目前位置載入指令。</p></details>
     <details><summary>可以讓 AI 直接推送到 GitHub 嗎？</summary><p>可以，前提是你在 claude.ai 連結了 GitHub 並授權該倉庫。日常同步私人庫仍建議雙擊 <code>git-sync.bat</code>。</p></details>
     <details><summary>放在 GitHub 的私人庫裡有個資怎麼辦？</summary><p>倉庫務必設成 Private。庫內已規定個資代號化、金鑰不入檔；公開倉庫只放通過公開檢查的成品。</p></details>
+    <details><summary>「小正」是真人或某個模型的名字嗎？</summary><p>都不是。小正是這座第二大腦的名字，由 Claude、Codex、Antigravity 共同使用。問「你是誰」或「用什麼模型」時，AI 會照實說明實際使用的工具與模型。</p></details>
+    <details><summary>怎麼在另一台電腦設一個一樣的小正？</summary><p>先在這台執行 <code>git-sync.bat</code> 推上最新內容；到另一台安裝 Git 與 Obsidian，<code>git clone</code> 私人倉庫，用 Obsidian 開啟，再把資料夾連給 AI 工具。之後兩台都用 <code>git-sync.bat</code> 保持一致，並避免同時改同一個檔案。</p></details>
     <details><summary>改了檔案要不要更新 YAML？</summary><p>要。修改時保留並更新頂部的 <code>tags</code>、<code>date</code>、<code>updated</code>、<code>type</code>。</p></details>
   </section>
 
   </main>
 </div>
 
-<footer>第二大腦使用說明書 · 依 2026-10-03 的庫內設定整理 · 設定更新後請重新產生</footer>
+<footer>小正（第二大腦）使用說明書 · 依 2026-10-03 22:50 的庫內設定整理 · 設定更新後請重新產生</footer>
 
 <script>
 (function () {
@@ -283,7 +291,8 @@
       { n: "style-guide.md", d: "用語風格與各類文件寫法" },
       { n: "rules.md", d: "全域規則完整版" },
       { n: "parameters.md", d: "重要參數與編號 PRM-領域-NNN" },
-      { n: "publish-rules.md", d: "公開發布規則" } ] },
+      { n: "publish-rules.md", d: "公開發布規則" },
+      { n: "identity.md", d: "第二大腦的名字「小正」" } ] },
     { n: "00_Inbox/", d: "零阻力速記區：未整理的資料、草稿都先放這裡" },
     { n: "10_Projects/", d: "專案區：程式專案與教學專案", c: [
       { n: "Dev_專案範例/", d: "程式專案：架構、技術選型、ADR、Bug 覆盤" },
@@ -299,14 +308,19 @@
       { n: "02_文獻筆記/", d: "書籍、論文、課程的摘要與心得" },
       { n: "03_永久卡片/", d: "一想法一卡片，連結成網" },
       { n: "04_主題地圖/", d: "把相關卡片串成主題的入口頁" } ] },
-    { n: "40_Archives/", d: "歸檔區：結案專案、過期檔案、被撤下的頁面、被取代的舊檔" },
+    { n: "40_Archives/", d: "歸檔區：結案專案、過期檔案、被撤下的頁面、被取代的舊檔", c: [
+      { n: "published-html/", d: "被撤下的公開頁面（整個資料夾）" },
+      { n: "scripts/", d: "被取代的舊工具程式" },
+      { n: "skill-sync-backup/", d: "技能同步前的舊檔備份" } ] },
     { n: "50_Daily/", d: "每日工作日誌 YYYY-MM-DD.md，記錄交辦軌跡" },
     { n: "60_Templates/", d: "各類卡片與筆記的 YAML 範本" },
     { n: "70_Script/", d: "本機雙擊執行的工具程式（.bat／.ps1）與其 README" },
     { n: "80_Publish/", d: "已通過公開檢查、準備推送到公開網頁的 HTML", c: [
-      { n: "YYYYMMDDNN/", d: "每次發布一個資料夾，主檔 index.html" },
+      { n: "YYYYMMDDNN/", d: "每次發布一個資料夾（例如 2026100302/），主檔 index.html" },
       { n: "publish-log.md", d: "發布編號對照表（不會被公開）" } ] },
     { n: ".agents/skills/", d: "技能庫（Codex、Antigravity 讀取）" },
+    { n: ".gitignore", d: "不同步到 GitHub 的檔案（Obsidian 視窗配置、金鑰、系統垃圾檔）" },
+    { n: ".git/", d: "版本庫資料，由 git 管理，不要手動改" },
     { n: ".claude/", d: "Claude 專用位置", c: [
       { n: "skills/", d: "技能庫（Claude 讀取，內容與 .agents/skills 相同）" },
       { n: "commands/", d: "斜線指令，例如 /today（只有 Claude 能用）" } ] },
