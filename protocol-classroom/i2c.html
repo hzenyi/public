@@ -1,0 +1,1077 @@
+<title>I2C 通訊教室</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg:#faf7ee;
+    --surface:#ffffff;
+    --surface-2:#eef6ee;
+    --ink:#233229;
+    --muted:#6f8074;
+    --line:#dfe9e0;
+    --accent:#2f9e8f;
+    --accent-soft:#d6f0ea;
+    --accent-ink:#ffffff;
+    --amber:#eeab33;
+    --amber-soft:#fbe9c8;
+    --amber-ink:#3c2a04;
+    --coral:#e2665b;
+    --coral-soft:#fbe1de;
+    --shadow: 0 18px 40px -22px rgba(35,50,41,.35);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141d18;
+      --surface:#1c2721;
+      --surface-2:#223028;
+      --ink:#eef5ee;
+      --muted:#9db3a4;
+      --line:#31413a;
+      --accent:#5fd0bd;
+      --accent-soft:#20423c;
+      --accent-ink:#0c2320;
+      --amber:#f2c369;
+      --amber-soft:#3d3013;
+      --amber-ink:#fdf3dd;
+      --coral:#f0958c;
+      --coral-soft:#402322;
+      --shadow: 0 18px 40px -20px rgba(0,0,0,.55);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141d18;
+    --surface:#1c2721;
+    --surface-2:#223028;
+    --ink:#eef5ee;
+    --muted:#9db3a4;
+    --line:#31413a;
+    --accent:#5fd0bd;
+    --accent-soft:#20423c;
+    --accent-ink:#0c2320;
+    --amber:#f2c369;
+    --amber-soft:#3d3013;
+    --amber-ink:#fdf3dd;
+    --coral:#f0958c;
+    --coral-soft:#402322;
+    --shadow: 0 18px 40px -20px rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Noto Sans TC","Baloo 2",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .latin{ font-family:"Baloo 2","Noto Sans TC",sans-serif; }
+  .mono{ font-family:"JetBrains Mono",monospace; }
+  h1,h2,h3{ text-wrap:balance; margin:0; }
+  p{ margin:0; }
+  button{ font-family:inherit; }
+
+  /* ---------- deck shell ---------- */
+  .deck{ height:100%; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+  .progress-track{ height:5px; background:var(--surface-2); flex:none; }
+  .progress-fill{
+    height:100%; width:12.5%;
+    background:linear-gradient(90deg,var(--accent),var(--amber));
+    transition:width .45s cubic-bezier(.65,0,.35,1);
+  }
+  .slides{ flex:1; position:relative; min-height:0; }
+  .slide{
+    position:absolute; inset:0;
+    display:flex; justify-content:center;
+    padding: clamp(20px,4vw,48px) clamp(16px,6vw,72px) clamp(84px,10vh,120px);
+    opacity:0; transform:translateX(36px) scale(.99);
+    transition:opacity .5s ease, transform .5s ease;
+    pointer-events:none; overflow-y:auto;
+  }
+  .slide.leaving-back{ transform:translateX(-36px) scale(.99); }
+  .slide.active{ opacity:1; transform:translateX(0) scale(1); pointer-events:auto; }
+  .slide-inner{ width:100%; max-width:960px; margin:auto; display:flex; flex-direction:column; gap:20px; }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px; align-self:flex-start;
+    font-family:"Baloo 2",sans-serif; font-size:13px; font-weight:700;
+    letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent); background:var(--accent-soft);
+    padding:6px 14px; border-radius:999px;
+  }
+  .slide h2{ font-size:clamp(24px,4vw,36px); font-weight:900; line-height:1.25; }
+  .slide h2 .num{ font-family:"Baloo 2",sans-serif; color:var(--accent); margin-right:8px; }
+  .lede{ font-size:clamp(14.5px,2vw,16.5px); line-height:1.85; color:var(--ink); max-width:70ch; }
+  .lede b{ color:var(--accent); font-weight:700; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:20px; box-shadow:var(--shadow); }
+  .hint{ font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .hint svg{ flex:none; }
+
+  /* ---------- nav ---------- */
+  .nav{
+    position:fixed; left:0;right:0;bottom:0;
+    display:flex; align-items:center; justify-content:center; gap:18px;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(180deg, transparent, var(--bg) 40%);
+  }
+  .nav-btn{
+    width:44px;height:44px; border-radius:50%;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer; box-shadow:var(--shadow); font-size:18px;
+    transition:transform .15s ease, background .15s ease; flex:none;
+  }
+  .nav-btn:hover{ transform:translateY(-2px); }
+  .nav-btn:disabled{ opacity:.35; cursor:default; transform:none; }
+  .nav-btn:focus-visible, .flip-card:focus-visible, .seg:focus-visible, .opt:focus-visible, .cta:focus-visible, .pin:focus-visible, .device:focus-visible, input:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px;
+  }
+  .dots{ display:flex; gap:7px; padding:0 6px; }
+  .dot{ width:8px;height:8px;border-radius:50%; background:var(--line); border:none;cursor:pointer; transition:all .25s ease; padding:0; }
+  .dot.on{ width:22px; background:var(--accent); border-radius:6px; }
+
+  .cta{
+    align-self:flex-start; display:inline-flex; align-items:center; gap:10px;
+    background:var(--accent); color:var(--accent-ink); border:none;
+    padding:13px 24px; border-radius:999px; font-size:15px; font-weight:700;
+    cursor:pointer; box-shadow:var(--shadow); transition:transform .15s ease;
+  }
+  .cta:hover{ transform:translateY(-2px); }
+  .cta.secondary{ background:var(--surface); color:var(--ink); border:1px solid var(--line); }
+  .cta.small{ padding:9px 16px; font-size:13px; }
+
+  /* ============ SLIDE 0 : title ============ */
+  .s0-inner{ align-items:center; text-align:center; gap:26px; }
+  .s0-badge{
+    width:96px;height:96px;border-radius:26px;
+    background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .s0-title{ font-size:clamp(34px,7vw,58px); font-weight:900; line-height:1.15; }
+  .s0-title .latin{ color:var(--accent); font-weight:800; }
+  .s0-sub{ font-size:clamp(14.5px,2.2vw,17px); color:var(--muted); max-width:54ch; line-height:1.8; }
+  .s0-tags{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+  .s0-tag{
+    font-family:"Baloo 2",sans-serif; font-size:12.5px; font-weight:700; letter-spacing:.03em;
+    padding:7px 14px; border-radius:999px; background:var(--surface-2); color:var(--ink); border:1px solid var(--line);
+  }
+  .clock-strip{ width:min(520px,90%); height:64px; }
+  .clock-strip path{ fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+  .clock-strip .sda-p{ stroke:var(--amber); }
+
+  /* ============ SLIDE 1 : what is I2C ============ */
+  .letters{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media (max-width:560px){ .letters{ grid-template-columns:1fr;} }
+  .flip-card{ perspective:1000px; height:140px; cursor:pointer; background:transparent; border:none; padding:0; }
+  .flip-inner{ position:relative; width:100%;height:100%; transition:transform .55s cubic-bezier(.65,0,.35,1); transform-style:preserve-3d; }
+  .flip-card.flipped .flip-inner{ transform:rotateY(180deg); }
+  .flip-face{
+    position:absolute; inset:0; border-radius:16px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    backface-visibility:hidden; padding:10px; text-align:center; border:1px solid var(--line);
+  }
+  .flip-front{ background:var(--surface); box-shadow:var(--shadow); }
+  .flip-front .big{ font-family:"Baloo 2",sans-serif; font-size:36px; font-weight:800; color:var(--accent); }
+  .flip-front .small{ font-size:12px; color:var(--muted); margin-top:4px; }
+  .flip-back{ background:var(--accent); color:var(--accent-ink); transform:rotateY(180deg); }
+  .flip-back .word{ font-family:"Baloo 2",sans-serif; font-weight:700; font-size:15px; }
+  .flip-back .desc{ font-size:12px; margin-top:6px; line-height:1.5; opacity:.95; }
+  .compare-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:560px){ .compare-row{ grid-template-columns:1fr; } }
+  .compare-card{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 16px; }
+  .compare-card .tt{ font-family:"Baloo 2",sans-serif; font-weight:700; font-size:13.5px; color:var(--accent); margin-bottom:6px; }
+  .compare-card p{ font-size:12.5px; line-height:1.7; color:var(--ink); }
+
+  /* ============ SLIDE 2 : bus / pull-up ============ */
+  .bus-wrap{ display:flex; justify-content:center; }
+  .bus-svg{ width:100%; max-width:640px; height:auto; }
+  .device{ cursor:pointer; }
+  .device rect{ transition:filter .2s ease; }
+  .device:hover rect, .device.active rect{ filter:brightness(1.08); }
+  .bus-line{ stroke-width:3; fill:none; stroke-linecap:round; transition:stroke .25s ease, opacity .25s ease, stroke-dasharray .25s ease; }
+  .bus-line.floating{ stroke-dasharray:2 8; opacity:.55; }
+  .res-symbol{ transition:opacity .25s ease; }
+  .res-symbol.hidden-res{ opacity:.15; }
+  .bus-info{
+    min-height:64px; background:var(--surface-2); border-radius:14px;
+    padding:14px 16px; font-size:13.5px; line-height:1.7; color:var(--ink);
+  }
+  .bus-info b{ color:var(--accent); }
+  .bus-result{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:12px 16px; font-size:13.5px; line-height:1.7; }
+
+  /* ============ SLIDE 3 : GND ============ */
+  .gnd-diagram{ display:flex; flex-direction:column; gap:16px; }
+  .gnd-svg{ width:100%; max-width:560px; height:auto; margin:0 auto; display:block; }
+  #gndBaselineB{ transition:transform .25s ease; }
+  #gndBaselineB.floating{ animation:gndFloat 1.4s ease-in-out infinite; }
+  @keyframes gndFloat{
+    0%,100%{ transform:translateY(0); }
+    30%{ transform:translateY(-9px); }
+    65%{ transform:translateY(6px); }
+  }
+  #gndWire.broken{ stroke-dasharray:6 7; stroke:var(--coral); }
+  #gndSwitchIcon{ transition:transform .2s ease; }
+  #gndSwitchIcon.off{ transform:translate(260px,50px) rotate(90deg) scale(1.05); }
+  .bit-compare{ display:flex; flex-direction:column; gap:8px; }
+  .bit-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .bit-row .row-label{ font-size:12.5px; color:var(--muted); width:170px; flex:none; }
+  .bits{ display:flex; gap:5px; flex-wrap:wrap; }
+  .bit{
+    width:30px;height:30px; border-radius:8px; background:var(--surface); border:1.5px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-family:"JetBrains Mono",monospace; font-weight:700; font-size:14px; color:var(--ink);
+    transition:all .2s ease;
+  }
+  .bit.bit-bad{ border-color:var(--coral); background:var(--coral-soft); color:var(--coral); }
+  .gnd-result{ background:var(--surface-2); border-radius:14px; padding:12px 16px; font-size:13.5px; line-height:1.7; }
+
+  /* ============ SLIDE 3 : start/stop ============ */
+  .cond-btns{ display:flex; gap:10px; flex-wrap:wrap; }
+  .cond-wrap{ background:var(--surface-2); border-radius:16px; padding:16px; overflow-x:auto; }
+  .cond-svg{ width:100%; min-width:420px; height:150px; }
+  .cond-note{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:12px 16px; font-size:13.5px; line-height:1.7; min-height:22px; }
+  .cond-note b{ color:var(--accent); }
+
+  /* ============ SLIDE 4 : address frame ============ */
+  .frame-row{ display:flex; gap:3px; overflow-x:auto; padding-bottom:6px; }
+  .seg{
+    flex:none; min-width:50px; height:74px; border-radius:10px; border:2px solid var(--line);
+    background:var(--surface); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; transition:transform .15s ease, border-color .15s ease; padding:4px;
+  }
+  .seg .lvl{ font-family:"JetBrains Mono",monospace; font-weight:700; font-size:14px; }
+  .seg .lbl{ font-size:9px; color:var(--muted); margin-top:4px; text-align:center; line-height:1.3; }
+  .seg.start{ border-color:var(--coral); } .seg.start .lvl{ color:var(--coral); }
+  .seg.addr{ border-color:var(--accent); } .seg.addr .lvl{ color:var(--accent); }
+  .seg.rw{ border-color:var(--amber); } .seg.rw .lvl{ color:var(--amber-ink); }
+  .seg.ack{ border-color:var(--amber); background:var(--amber-soft); } .seg.ack .lvl{ color:var(--amber-ink); }
+  .seg.data{ border-color:var(--accent); background:var(--accent-soft); } .seg.data .lvl{ color:var(--accent); }
+  .seg.stop{ border-color:var(--coral); } .seg.stop .lvl{ color:var(--coral); }
+  .seg.selected{ transform:translateY(-6px); box-shadow:var(--shadow); }
+  .frame-detail{ background:var(--surface-2); border-radius:16px; padding:16px 18px; font-size:13.5px; line-height:1.75; min-height:92px; }
+  .frame-detail .tag{
+    font-family:"Baloo 2",sans-serif; font-weight:700; font-size:12.5px; letter-spacing:.04em;
+    display:inline-block; margin-bottom:6px; padding:3px 10px; border-radius:999px;
+  }
+
+  /* ============ SLIDE 5 : simulate ============ */
+  .pick-row{ display:flex; flex-direction:column; gap:8px; }
+  .pick-row .pick-label{ font-size:12.5px; color:var(--muted); }
+  .pick-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+  .pick-btn{
+    padding:9px 14px; border-radius:12px; border:1.5px solid var(--line); background:var(--surface);
+    font-size:12.5px; cursor:pointer; color:var(--ink); display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  }
+  .pick-btn .hex{ font-family:"JetBrains Mono",monospace; font-weight:700; color:var(--accent); }
+  .pick-btn.sel{ background:var(--accent-soft); border-color:var(--accent); }
+  .wave-wrap{ background:var(--surface-2); border-radius:16px; padding:16px; overflow-x:auto; }
+  .wave-svg{ min-width:760px; width:100%; height:170px; }
+  .wave-line{ fill:none; stroke-width:2.5; }
+  .wave-line.scl{ stroke:var(--accent); }
+  .wave-line.sda{ stroke:var(--amber); }
+  .wave-mask{ fill:var(--coral); opacity:.28; }
+  .wave-mask-text{ fill:#fff; stroke:var(--coral); stroke-width:2px; paint-order:stroke fill; font-weight:800; }
+  .wave-labels{ display:flex; width:100%; min-width:760px; }
+  .wave-labels span{ flex:1 1 0; width:0; text-align:center; font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .now-strip{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:12px 16px; font-size:13.5px; min-height:22px; }
+  .now-strip b{ color:var(--accent); }
+  .info-chips{ display:flex; gap:10px; flex-wrap:wrap; font-family:"JetBrains Mono",monospace; font-size:12.5px; }
+  .info-chips div{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:6px 10px; }
+
+  /* ============ SLIDE 6 : quiz ============ */
+  .quiz-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .score-pill{ font-family:"Baloo 2",sans-serif; font-weight:700; font-size:13px; background:var(--amber-soft); color:var(--amber-ink); padding:6px 14px; border-radius:999px; }
+  .q-card{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 18px; display:flex; flex-direction:column; gap:10px; }
+  .q-title{ font-weight:700; font-size:14.5px; }
+  .opts{ display:flex; flex-direction:column; gap:8px; }
+  .opt{ text-align:left; padding:10px 14px; border-radius:12px; border:1.5px solid var(--line); background:var(--surface-2); cursor:pointer; font-size:13.5px; color:var(--ink); }
+  .opt.correct{ border-color:var(--accent); background:var(--accent-soft); }
+  .opt.wrong{ border-color:var(--coral); background:var(--coral-soft); }
+  .opt:disabled{ cursor:default; }
+  .q-explain{ font-size:12.5px; color:var(--muted); line-height:1.6; display:none; }
+  .q-explain.show{ display:block; }
+
+  /* ============ SLIDE 7 : summary ============ */
+  .sum-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  @media (max-width:560px){ .sum-grid{ grid-template-columns:1fr; } }
+  .sum-item{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 16px; display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.6; }
+  .sum-item svg{ flex:none; margin-top:2px; }
+  .sum-item b{ display:block; font-size:13.5px; margin-bottom:2px; }
+  .thanks-note{ background:var(--surface-2); border-radius:16px; padding:16px 18px; font-size:13.5px; line-height:1.8; }
+
+  @media (prefers-reduced-motion: reduce){
+    .slide, .flip-inner, .cta, .nav-btn{ transition:none !important; }
+  }
+</style>
+
+<div class="deck" id="deck">
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="slides" id="slides">
+
+    <!-- SLIDE 0 -->
+    <section class="slide" data-i="0">
+      <div class="slide-inner s0-inner">
+        <div class="s0-badge">
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <rect x="4" y="4" width="44" height="44" rx="12" fill="var(--accent-soft)"/>
+            <rect x="17" y="17" width="18" height="18" rx="4" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+            <path d="M17 22H10M17 30H10M42 22h-7M42 30h-7M22 17v-7M30 17v-7M22 42v-7M30 42v-7" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="eyebrow">電路設計課 · CIRCUIT DESIGN</div>
+        <h1 class="s0-title"><span class="latin">I2C</span> 通訊協定</h1>
+        <p class="s0-sub">一次搞懂兩線式同步匯流排：<b style="color:var(--ink)">SDA、SCL、位址、START／STOP、ACK 與提升電阻</b>，並實際看看主機如何跟匯流排上的裝置對話。</p>
+        <svg class="clock-strip" viewBox="0 0 520 64" preserveAspectRatio="none">
+          <path d="M0 20 H60 V44 H100 V20 H140 V44 H180 V20 H220 V44 H260 V20 H300 V44 H340 V20 H380 V44 H420 V20 H460 V44 H520"/>
+          <path class="sda-p" d="M0 50 H90 V26 H260 V50 H520" style="opacity:.6"/>
+        </svg>
+        <div class="s0-tags">
+          <span class="s0-tag latin">SDA / SCL</span>
+          <span class="s0-tag latin">START / STOP</span>
+          <span class="s0-tag">位址 · ACK · 提升電阻</span>
+        </div>
+        <button class="cta" id="startBtn">開始上課
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8h8M8 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- SLIDE 1 -->
+    <section class="slide" data-i="1">
+      <div class="slide-inner">
+        <div class="eyebrow">01 · 認識 I2C</div>
+        <h2><span class="num latin">01</span>什麼是 I2C？</h2>
+        <p class="lede"><span class="latin" style="font-weight:700;color:var(--accent)">I2C</span>（Inter-Integrated Circuit，唸作 I-squared-C，也常寫作 IIC）是一種只用<b>兩條線</b>就能連接<b>很多顆</b>裝置的同步序列匯流排，感測器、OLED 顯示器、即時時鐘模組常常都是用它跟主控板溝通。跟 UART 最大的不同：I2C 有一條共用的<b>時脈線 SCL</b>，收發雙方跟著同一個節奏走，不用像 UART 一樣事先講好鮑率。</p>
+        <div class="letters" id="letters"></div>
+        <div class="compare-row">
+          <div class="compare-card">
+            <div class="tt latin">UART（上一堂課）</div>
+            <p>點對點連接，兩顆裝置各自的 TX/RX 交叉接；<b>非同步</b>，靠事先講好的鮑率對齊時間；一條線同時間只能接一組裝置。</p>
+          </div>
+          <div class="compare-card">
+            <div class="tt latin">I2C（這堂課）</div>
+            <p>匯流排式連接，所有裝置共用同一組 SDA/SCL；<b>同步</b>，靠 SCL 時脈對齊；可以在同一組線上接很多裝置，用位址分辨彼此。</p>
+          </div>
+        </div>
+        <p class="hint">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M7 4v3.2l2 1.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          點一下卡片，看看 I2C 三個字母代表什麼
+        </p>
+      </div>
+    </section>
+
+    <!-- SLIDE 2 -->
+    <section class="slide" data-i="2">
+      <div class="slide-inner">
+        <div class="eyebrow">02 · 接線與匯流排</div>
+        <h2><span class="num latin">02</span>SDA / SCL 與提升電阻</h2>
+        <p class="lede">I2C 只有兩條線：<b>SDA（Serial Data，資料線）</b>負責傳資料，<b>SCL（Serial Clock，時脈線）</b>負責提供節奏，所有裝置都掛在同一組線上（稱為「匯流排」）。這兩條線都是<b>開洩極（Open-drain）</b>輸出：裝置只能把線「拉低」，沒辦法主動把線「拉高」，所以一定要外接<b>提升電阻（Pull-up Resistor）</b>接到電源，線路閒置時才能回到高電位。</p>
+        <div class="bus-wrap">
+          <svg class="bus-svg" viewBox="0 0 640 210" id="busSvg">
+            <text x="40" y="24" font-family="Baloo 2, sans-serif" font-size="12" font-weight="700" fill="var(--muted)">VCC</text>
+            <line x1="40" y1="30" x2="600" y2="30" stroke="var(--line)" stroke-width="2"/>
+
+            <g id="resSDA" class="res-symbol" transform="translate(120,30)">
+              <line x1="0" y1="0" x2="0" y2="10" stroke="var(--amber)" stroke-width="2.5"/>
+              <path d="M0 10 l6 4 l-12 4 l12 4 l-12 4 l6 4" stroke="var(--amber)" stroke-width="2.5" fill="none"/>
+              <line x1="0" y1="30" x2="0" y2="40" stroke="var(--amber)" stroke-width="2.5"/>
+            </g>
+            <g id="resSCL" class="res-symbol" transform="translate(180,30)">
+              <line x1="0" y1="0" x2="0" y2="10" stroke="var(--accent)" stroke-width="2.5"/>
+              <path d="M0 10 l6 4 l-12 4 l12 4 l-12 4 l6 4" stroke="var(--accent)" stroke-width="2.5" fill="none"/>
+              <line x1="0" y1="30" x2="0" y2="40" stroke="var(--accent)" stroke-width="2.5"/>
+            </g>
+
+            <line id="lineSDA" class="bus-line" x1="46" y1="70" x2="610" y2="70" stroke="var(--amber)"/>
+            <text x="42" y="74" text-anchor="end" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--amber-ink)">SDA</text>
+            <line id="lineSCL" class="bus-line" x1="46" y1="100" x2="610" y2="100" stroke="var(--accent)"/>
+            <text x="42" y="104" text-anchor="end" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--accent)">SCL</text>
+
+            <g class="device" data-dev="master" transform="translate(40,130)">
+              <rect width="110" height="56" rx="12" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+              <text x="55" y="24" text-anchor="middle" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--ink)">主機 Master</text>
+              <text x="55" y="42" text-anchor="middle" font-family="JetBrains Mono" font-size="10.5" fill="var(--muted)">Arduino</text>
+            </g>
+            <line x1="70" y1="130" x2="70" y2="100" stroke="var(--line)" stroke-dasharray="2 3"/>
+            <line x1="110" y1="130" x2="110" y2="70" stroke="var(--line)" stroke-dasharray="2 3"/>
+
+            <g class="device" data-dev="oled" transform="translate(200,130)">
+              <rect width="110" height="56" rx="12" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+              <text x="55" y="24" text-anchor="middle" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--ink)">OLED 顯示器</text>
+              <text x="55" y="42" text-anchor="middle" font-family="JetBrains Mono" font-size="10.5" fill="var(--accent)">0x3C</text>
+            </g>
+            <line x1="230" y1="130" x2="230" y2="100" stroke="var(--line)" stroke-dasharray="2 3"/>
+            <line x1="270" y1="130" x2="270" y2="70" stroke="var(--line)" stroke-dasharray="2 3"/>
+
+            <g class="device" data-dev="rtc" transform="translate(360,130)">
+              <rect width="110" height="56" rx="12" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+              <text x="55" y="24" text-anchor="middle" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--ink)">即時時鐘 RTC</text>
+              <text x="55" y="42" text-anchor="middle" font-family="JetBrains Mono" font-size="10.5" fill="var(--accent)">0x68</text>
+            </g>
+            <line x1="390" y1="130" x2="390" y2="100" stroke="var(--line)" stroke-dasharray="2 3"/>
+            <line x1="430" y1="130" x2="430" y2="70" stroke="var(--line)" stroke-dasharray="2 3"/>
+
+            <g class="device" data-dev="baro" transform="translate(490,130)">
+              <rect width="110" height="56" rx="12" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+              <text x="55" y="24" text-anchor="middle" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--ink)">氣壓感測器</text>
+              <text x="55" y="42" text-anchor="middle" font-family="JetBrains Mono" font-size="10.5" fill="var(--accent)">0x76</text>
+            </g>
+            <line x1="520" y1="130" x2="520" y2="100" stroke="var(--line)" stroke-dasharray="2 3"/>
+            <line x1="560" y1="130" x2="560" y2="70" stroke="var(--line)" stroke-dasharray="2 3"/>
+          </svg>
+        </div>
+        <div class="bus-info" id="busInfo">👆 點一下上面任一個裝置方塊，看看它在匯流排上的角色。</div>
+        <button class="cta secondary" id="pullupToggle">🔧 提升電阻：已安裝（點一下模擬移除）</button>
+        <div class="bus-result" id="busResult">✅ SDA、SCL 平時都被電阻拉在高電位，裝置需要溝通時再主動拉低，這樣大家才能共用同一組線。</div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3 : GND -->
+    <section class="slide" data-i="3">
+      <div class="slide-inner">
+        <div class="eyebrow">03 · 共地是關鍵</div>
+        <h2><span class="num latin">03</span>就算接對 SDA/SCL，也要共地</h2>
+        <p class="lede">高低電位是相對於 <b>GND（0V 參考）</b>來判斷的。就算 SDA、SCL 接得完全正確，只要主機和裝置沒有共用 GND，兩邊對「多少電壓算 1、多少算 0」的認知就會不一樣，訊號一樣可能被誤判。按下按鈕，實際比較「有共地」跟「沒共地」的差別：</p>
+        <div class="gnd-diagram">
+          <svg class="gnd-svg" viewBox="0 0 520 150" preserveAspectRatio="xMidYMid meet">
+            <rect x="16" y="16" width="140" height="70" rx="14" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <text x="86" y="42" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="700" font-size="14" fill="var(--ink)">主機</text>
+            <line x1="26" y1="66" x2="146" y2="66" stroke="var(--muted)" stroke-width="2"/>
+            <text x="86" y="80" text-anchor="middle" font-family="Noto Sans TC" font-size="9.5" fill="var(--muted)">主機的 0V 參考</text>
+
+            <rect x="364" y="16" width="140" height="70" rx="14" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <text x="434" y="42" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="700" font-size="14" fill="var(--ink)">裝置</text>
+            <g id="gndBaselineB">
+              <line x1="374" y1="66" x2="494" y2="66" stroke="var(--muted)" stroke-width="2"/>
+              <text x="434" y="80" text-anchor="middle" font-family="Noto Sans TC" font-size="9.5" fill="var(--muted)">裝置的 0V 參考</text>
+            </g>
+
+            <path id="gndWire" d="M156 66 H364" stroke="var(--accent)" stroke-width="3" fill="none"/>
+            <g id="gndSwitchIcon" transform="translate(260,50)">
+              <circle r="13" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+              <text x="0" y="5" text-anchor="middle" font-size="14">🔌</text>
+            </g>
+            <text x="260" y="102" text-anchor="middle" font-family="Noto Sans TC" font-size="10.5" fill="var(--muted)">GND 連接線</text>
+          </svg>
+          <button class="cta" id="gndToggle">🔌 GND 已連接（點一下模擬斷開）</button>
+          <div class="bit-compare">
+            <div class="bit-row"><span class="row-label">主機送出（位址+R/W）</span><div class="bits" id="bitsA"></div></div>
+            <div class="bit-row"><span class="row-label">裝置收到的判讀</span><div class="bits" id="bitsB"></div></div>
+          </div>
+          <div class="gnd-result" id="gndResult">✅ 共地時，兩邊的 0V 參考一致，裝置能正確判讀每一個位元。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4 -->
+    <section class="slide" data-i="4">
+      <div class="slide-inner">
+        <div class="eyebrow">04 · START / STOP</div>
+        <h2><span class="num latin">04</span>START 與 STOP 條件</h2>
+        <p class="lede">I2C 沒有額外的「起始位元」，而是用 SDA 和 SCL 兩條線的<b>相對變化</b>來表示一次通訊的開始與結束：<b>SCL 保持高電位</b>時，若 <b>SDA 由高變低</b>就是 <b>START</b>；若 <b>SDA 由低變高</b>就是 <b>STOP</b>。正常傳送資料位元時，SDA 只能在 <b>SCL 是低電位</b>時改變，這樣才不會被誤判成 START 或 STOP。</p>
+        <div class="cond-btns">
+          <button class="cta small" id="btnStart">▶ 示範 START</button>
+          <button class="cta small secondary" id="btnStop">▶ 示範 STOP</button>
+          <button class="cta small secondary" id="btnBit1">▶ 示範傳送位元 1</button>
+          <button class="cta small secondary" id="btnBit0">▶ 示範傳送位元 0</button>
+        </div>
+        <div class="cond-wrap">
+          <svg class="cond-svg" id="condSvg" viewBox="0 0 420 150" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div class="cond-note" id="condNote">👆 按上面的按鈕，看看 SCL 高／低電位時，SDA 的變化分別代表什麼意思。</div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5 -->
+    <section class="slide" data-i="5">
+      <div class="slide-inner">
+        <div class="eyebrow">05 · 定址與應答</div>
+        <h2><span class="num latin">05</span>位址、讀寫與 ACK</h2>
+        <p class="lede">START 之後，主機會先送出<b>7 個位元的裝置位址</b>（A6～A0，例如 OLED 是 0x3C），再加 1 個<b>讀寫位元 R/W</b>（0 = 寫入、1 = 讀取）。匯流排上所有裝置都會聽到，只有位址相符的裝置會回應：把 SDA 拉低送出 <b>ACK</b>（應答），表示「我在這裡，收到了」；如果沒有人回應，SDA 會維持高電位，稱為 <b>NACK</b>。</p>
+        <div class="frame-row" id="frameRow"></div>
+        <div class="frame-detail" id="frameDetail">👆 點一下上面任一段方塊，看看它的意義。</div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6 -->
+    <section class="slide" data-i="6">
+      <div class="slide-inner">
+        <div class="eyebrow">06 · 實際模擬</div>
+        <h2><span class="num latin">06</span>完整傳輸模擬</h2>
+        <p class="lede">選一個要對話的裝置、再選一個要寫入的資料位元組，按下「送出」，看看 SCL（時脈）與 SDA（資料）兩條線如何一起合作，把一整個 I2C 寫入交易送出去。</p>
+        <div class="pick-row">
+          <span class="pick-label">目標裝置：</span>
+          <div class="pick-btns" id="devRow"></div>
+        </div>
+        <div class="pick-row">
+          <span class="pick-label">要寫入的資料位元組：</span>
+          <div class="pick-btns" id="dataRow"></div>
+        </div>
+        <div class="info-chips" id="infoChips"></div>
+        <div class="btn-row" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="cta" id="sendI2C">自動播放 ▶</button>
+          <button class="cta secondary" id="stepPrev">⏮ 上一步</button>
+          <button class="cta secondary" id="stepNext">下一步 ⏭</button>
+          <button class="cta secondary" id="stepReset">↺ 重置</button>
+        </div>
+        <div class="wave-wrap">
+          <svg class="wave-svg" id="waveSvg" viewBox="0 0 760 170" preserveAspectRatio="none"></svg>
+          <div class="wave-labels" id="waveLabels"></div>
+        </div>
+        <div class="now-strip" id="nowStrip">尚未送出資料。</div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7 -->
+    <section class="slide" data-i="7">
+      <div class="slide-inner">
+        <div class="eyebrow">07 · 小測驗</div>
+        <div class="quiz-head">
+          <h2><span class="num latin">07</span>重點回顧小測驗</h2>
+          <span class="score-pill" id="scorePill">得分 0 / 4</span>
+        </div>
+        <div id="quizList" style="display:flex;flex-direction:column;gap:12px;"></div>
+        <button class="cta secondary" id="resetQuiz">重新測驗</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 8 -->
+    <section class="slide" data-i="8">
+      <div class="slide-inner">
+        <div class="eyebrow">總結</div>
+        <h2>今天學到了什麼？</h2>
+        <div class="sum-grid">
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b class="latin">SDA / SCL</b>兩條共用線，分別負責資料與時脈節奏。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>同步協定</b>靠 SCL 對齊節奏，不用像 UART 一樣先講好鮑率。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>位址機制</b>每個裝置都有唯一位址，才能在同一組線上分辨彼此。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b class="latin">START / STOP</b>SCL 高電位時，SDA 的下降／上升緣分別代表通訊開始與結束。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b class="latin">ACK / NACK</b>接收端用 SDA 拉低與否，回應有沒有成功收到。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>提升電阻</b>開洩極輸出的必要條件，讓線路平時保持在高電位。</div></div>
+        </div>
+        <div class="thanks-note">🔬 <b>動手做做看：</b>下次進實驗室時，試著用示波器同時量測 SDA 與 SCL，你會看到今天畫的雙軌波形真的出現在螢幕上！<br><br>感謝大家的參與，下一堂課我們會實際用 Arduino 讀取 I2C 感測器的資料 👋</div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn" id="prevBtn" aria-label="上一頁">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="dots" id="dots"></div>
+    <button class="nav-btn" id="nextBtn" aria-label="下一頁">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var TOTAL = 9;
+  var cur = 0;
+  var slidesEl = document.querySelectorAll('.slide');
+  var dotsWrap = document.getElementById('dots');
+  var progressFill = document.getElementById('progressFill');
+  var prevBtn = document.getElementById('prevBtn');
+  var nextBtn = document.getElementById('nextBtn');
+
+  for (var i=0;i<TOTAL;i++){
+    var d = document.createElement('button');
+    d.className = 'dot' + (i===0 ? ' on' : '');
+    d.setAttribute('aria-label','跳到第 '+(i+1)+'頁');
+    d.addEventListener('click', (function(idx){ return function(){ goTo(idx); }; })(i));
+    dotsWrap.appendChild(d);
+  }
+  var dots = dotsWrap.querySelectorAll('.dot');
+
+  function render(prevIdx){
+    slidesEl.forEach(function(s){
+      var idx = parseInt(s.getAttribute('data-i'),10);
+      s.classList.remove('active','leaving-back');
+      if (idx === cur){ s.classList.add('active'); }
+      else if (prevIdx !== undefined && idx < cur){ s.classList.add('leaving-back'); }
+    });
+    dots.forEach(function(d,idx){ d.classList.toggle('on', idx===cur); });
+    progressFill.style.width = (((cur+1)/TOTAL)*100)+'%';
+    prevBtn.disabled = cur===0;
+    nextBtn.disabled = cur===TOTAL-1;
+  }
+  function goTo(i){
+    var prevIdx = cur;
+    cur = Math.max(0, Math.min(TOTAL-1, i));
+    render(prevIdx);
+  }
+  prevBtn.addEventListener('click', function(){ goTo(cur-1); });
+  nextBtn.addEventListener('click', function(){ goTo(cur+1); });
+  document.getElementById('startBtn').addEventListener('click', function(){ goTo(1); });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight') goTo(cur+1);
+    if (e.key === 'ArrowLeft') goTo(cur-1);
+  });
+
+  var touchX = null;
+  document.getElementById('slides').addEventListener('touchstart', function(e){ touchX = e.touches[0].clientX; }, {passive:true});
+  document.getElementById('slides').addEventListener('touchend', function(e){
+    if (touchX===null) return;
+    var dx = e.changedTouches[0].clientX - touchX;
+    if (dx > 60) goTo(cur-1);
+    else if (dx < -60) goTo(cur+1);
+    touchX = null;
+  }, {passive:true});
+
+  render();
+
+  /* ---------------- Slide 1 : I2C flip letters ---------------- */
+  var letters = [
+    {ch:'I', word:'Inter', sub:'裝置之間', desc:'代表訊號是在多個積體電路「之間」傳遞，而不是單一晶片內部。'},
+    {ch:'I', word:'Integrated', sub:'積體電路', desc:'原本是設計來連接同一片電路板上的多顆 IC（積體電路）晶片。'},
+    {ch:'C', word:'Circuit', sub:'電路 / 匯流排', desc:'所有裝置共用同一組電路（匯流排），靠位址分辨彼此。'}
+  ];
+  var lettersWrap = document.getElementById('letters');
+  letters.forEach(function(L){
+    var btn = document.createElement('button');
+    btn.className = 'flip-card';
+    btn.innerHTML =
+      '<div class="flip-inner">'+
+        '<div class="flip-face flip-front"><div class="big latin">'+L.ch+'</div><div class="small">'+L.sub+'</div></div>'+
+        '<div class="flip-face flip-back"><div class="word latin">'+L.word+'</div><div class="desc">'+L.desc+'</div></div>'+
+      '</div>';
+    btn.addEventListener('click', function(){ this.classList.toggle('flipped'); });
+    lettersWrap.appendChild(btn);
+  });
+
+  /* ---------------- Slide 2 : bus / pull-up ---------------- */
+  var busInfo = document.getElementById('busInfo');
+  var busResult = document.getElementById('busResult');
+  var pullupToggle = document.getElementById('pullupToggle');
+  var lineSDA = document.getElementById('lineSDA');
+  var lineSCL = document.getElementById('lineSCL');
+  var resSDA = document.getElementById('resSDA');
+  var resSCL = document.getElementById('resSCL');
+  var pullupOn = true;
+
+  var devData = {
+    master: '主機（Master）：通常是 Arduino 這類控制板，負責產生 SCL 時脈、決定要跟哪個位址的裝置說話。',
+    oled: 'OLED 顯示器：從機（Slave）之一，位址是 <b>0x3C</b>，主機寫入畫面資料時才會回應。',
+    rtc: '即時時鐘 RTC：從機（Slave）之一，位址是 <b>0x68</b>，用來讀取現在的時間日期。',
+    baro: '氣壓感測器：從機（Slave）之一，位址是 <b>0x76</b>，用來讀取氣壓與溫度數值。'
+  };
+  document.querySelectorAll('.device').forEach(function(dev){
+    dev.addEventListener('click', function(){
+      document.querySelectorAll('.device').forEach(function(x){ x.classList.remove('active'); });
+      dev.classList.add('active');
+      busInfo.innerHTML = devData[dev.getAttribute('data-dev')];
+    });
+  });
+
+  function renderPullup(){
+    lineSDA.classList.toggle('floating', !pullupOn);
+    lineSCL.classList.toggle('floating', !pullupOn);
+    resSDA.classList.toggle('hidden-res', !pullupOn);
+    resSCL.classList.toggle('hidden-res', !pullupOn);
+    if (pullupOn){
+      pullupToggle.textContent = '🔧 提升電阻：已安裝（點一下模擬移除）';
+      busResult.innerHTML = '✅ SDA、SCL 平時都被電阻拉在高電位，裝置需要溝通時再主動拉低，這樣大家才能共用同一組線。';
+    } else {
+      pullupToggle.textContent = '⚠️ 提升電阻：已移除（點一下重新安裝）';
+      busResult.innerHTML = '❌ 少了提升電阻，開洩極輸出的線路平時會呈現「浮接」狀態，量不到穩定的高電位，裝置之間完全無法正常溝通！';
+    }
+  }
+  pullupToggle.addEventListener('click', function(){ pullupOn = !pullupOn; renderPullup(); });
+  renderPullup();
+
+  /* ---------------- Slide 3 : GND demo ---------------- */
+  var gndConnected = true;
+  var gndOriginalBits = [0,1,1,1,1,0,0,0]; // OLED address 0x3C (0111100) + R/W(0)
+  var gndCorruptIdx = [1,4]; // fixed bits that get misread once GND is disconnected
+  var bitsAEl = document.getElementById('bitsA');
+  var bitsBEl = document.getElementById('bitsB');
+  var gndResultEl = document.getElementById('gndResult');
+  var gndToggleBtn = document.getElementById('gndToggle');
+  var gndWireEl = document.getElementById('gndWire');
+  var gndSwitchEl = document.getElementById('gndSwitchIcon');
+  var gndBaselineBEl = document.getElementById('gndBaselineB');
+
+  function renderGnd(){
+    bitsAEl.innerHTML = gndOriginalBits.map(function(b){ return '<span class="bit">'+b+'</span>'; }).join('');
+    var display = gndOriginalBits.slice();
+    if (!gndConnected){
+      gndCorruptIdx.forEach(function(i){ display[i] = display[i] ? 0 : 1; });
+    }
+    bitsBEl.innerHTML = display.map(function(b,i){
+      var bad = !gndConnected && gndCorruptIdx.indexOf(i)!==-1;
+      return '<span class="bit'+(bad?' bit-bad':'')+'">'+b+'</span>';
+    }).join('');
+
+    gndWireEl.classList.toggle('broken', !gndConnected);
+    gndSwitchEl.classList.toggle('off', !gndConnected);
+    gndBaselineBEl.classList.toggle('floating', !gndConnected);
+
+    if (gndConnected){
+      gndToggleBtn.innerHTML = '🔌 GND 已連接（點一下模擬斷開）';
+      gndResultEl.innerHTML = '✅ 共地時，兩邊的 0V 參考一致，裝置能正確判讀每一個位元（包含位址與 R/W）。';
+    } else {
+      gndToggleBtn.innerHTML = '⚠️ GND 已斷開（點一下重新連接）';
+      gndResultEl.innerHTML = '❌ 沒有共地時，裝置端的 0V 參考會漂移不定，量到的 SDA/SCL 電壓忽高忽低，容易把高低電位判讀顛倒——紅色方塊就是被誤判的位元，裝置甚至可能認錯自己的位址，完全不回應。';
+    }
+  }
+  gndToggleBtn.addEventListener('click', function(){
+    gndConnected = !gndConnected;
+    renderGnd();
+  });
+  renderGnd();
+
+  /* ---------------- Slide 4 : START / STOP demo ---------------- */
+  var condSvg = document.getElementById('condSvg');
+  var condNote = document.getElementById('condNote');
+
+  function drawCond(kind){
+    var w=420, h=150;
+    var sclY=40, sdaHigh=95, sdaLow=125;
+    var parts = [
+      '<line x1="20" y1="20" x2="20" y2="'+(h-15)+'" stroke="var(--line)" stroke-width="1"/>',
+      '<text x="4" y="24" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--accent)">SCL</text>',
+      '<text x="4" y="99" font-family="Baloo 2" font-size="12" font-weight="700" fill="var(--amber-ink)">SDA</text>'
+    ];
+    var sclPath, sdaPath, markX, markLabel, markColor;
+    if (kind==='start'){
+      sclPath = 'M40 '+sclY+' L380 '+sclY;
+      sdaPath = 'M40 '+sdaHigh+' L200 '+sdaHigh+' L200 '+sdaLow+' L380 '+sdaLow;
+      markX = 200; markLabel='START'; markColor='var(--coral)';
+    } else if (kind==='stop'){
+      sclPath = 'M40 '+sclY+' L380 '+sclY;
+      sdaPath = 'M40 '+sdaLow+' L200 '+sdaLow+' L200 '+sdaHigh+' L380 '+sdaHigh;
+      markX = 200; markLabel='STOP'; markColor='var(--accent)';
+    } else {
+      var target = (kind==='bit1') ? sdaHigh : sdaLow;
+      var startLvl = (kind==='bit1') ? sdaLow : sdaHigh;
+      sclPath = 'M40 '+sdaLow+' L140 '+sdaLow+' L140 '+sclY+' L260 '+sclY+' L260 '+sdaLow+' L380 '+sdaLow;
+      sdaPath = 'M40 '+startLvl+' L120 '+startLvl+' L120 '+target+' L380 '+target;
+      markX = 190;
+      markLabel = (kind==='bit1') ? 'DATA = 1' : 'DATA = 0';
+      markColor = (kind==='bit1') ? 'var(--accent)' : 'var(--coral)';
+    }
+    parts.push('<path fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="'+sclPath+'"/>');
+    parts.push('<path fill="none" stroke="var(--amber)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="'+sdaPath+'"/>');
+    parts.push('<line x1="'+markX+'" y1="12" x2="'+markX+'" y2="'+(h-8)+'" stroke="'+markColor+'" stroke-width="2" stroke-dasharray="4 4"/>');
+    parts.push('<text x="'+markX+'" y="'+(h-2)+'" text-anchor="middle" font-family="Baloo 2" font-size="12" font-weight="700" fill="'+markColor+'">'+markLabel+'</text>');
+    condSvg.setAttribute('viewBox','0 0 '+w+' '+h);
+    condSvg.innerHTML = parts.join('');
+  }
+  document.getElementById('btnStart').addEventListener('click', function(){
+    drawCond('start');
+    condNote.innerHTML = '<b>START 條件</b>：SCL 維持高電位的時候，SDA 由高變低 — 這個「下降緣」就是在告訴匯流排上所有裝置：「我要開始傳資料了，大家專心聽」。';
+  });
+  document.getElementById('btnStop').addEventListener('click', function(){
+    drawCond('stop');
+    condNote.innerHTML = '<b>STOP 條件</b>：SCL 維持高電位的時候，SDA 由低變高 — 這個「上升緣」代表這次通訊已經結束，匯流排恢復閒置，其他裝置又可以使用了。';
+  });
+  document.getElementById('btnBit1').addEventListener('click', function(){
+    drawCond('bit1');
+    condNote.innerHTML = '<b>傳送位元 1</b>：SDA 趁 <b>SCL 還是低電位</b>時先改變並穩定在<b>高電位</b>；接著 SCL 拉高的這段期間 SDA 保持不動，接收端就會讀到 <b>1</b>。';
+  });
+  document.getElementById('btnBit0').addEventListener('click', function(){
+    drawCond('bit0');
+    condNote.innerHTML = '<b>傳送位元 0</b>：SDA 趁 <b>SCL 還是低電位</b>時先改變並穩定在<b>低電位</b>；接著 SCL 拉高的這段期間 SDA 保持不動，接收端就會讀到 <b>0</b>。兩種情況的差別只在 SDA 停在高電位還是低電位，變化的時機規則完全一樣。';
+  });
+  drawCond('start');
+
+  /* ---------------- Slide 4 : address frame ---------------- */
+  var frame4 = [
+    {cls:'start', lvl:'S', lbl:'START', tag:'START', color:'var(--coral)', desc:'SCL 高電位時 SDA 下降，通知匯流排上所有裝置：一次新的通訊要開始了。'}
+  ];
+  for (var a=6;a>=0;a--){
+    frame4.push({cls:'addr', lvl:String((0x3C>>a)&1), lbl:'A'+a, tag:'位址位元 A'+a, color:'var(--accent)', desc:'7 個位址位元（A6～A0，MSB 先送），決定要跟匯流排上哪一顆裝置對話。這裡示範的是 OLED 顯示器的位址 <span class="mono">0x3C</span>。'});
+  }
+  frame4.push({cls:'rw', lvl:'0', lbl:'R/W', tag:'讀寫位元', color:'var(--amber)', desc:'讀寫位元：<b>0 = 寫入（Write）</b>，主機要把資料送給裝置；<b>1 = 讀取（Read）</b>，主機要跟裝置要資料。'});
+  frame4.push({cls:'ack', lvl:'A', lbl:'ACK', tag:'應答 ACK', color:'var(--amber)', desc:'位址相符的裝置把 SDA 拉低，做為 <b>ACK</b>（應答），表示「我聽到自己的位址了」；如果沒人回應，SDA 維持高電位，就是 <b>NACK</b>。'});
+  for (var dbit=7;dbit>=0;dbit--){
+    frame4.push({cls:'data', lvl:'D', lbl:'D'+dbit, tag:'資料位元 D'+dbit, color:'var(--accent)', desc:'實際要傳送的 1 個位元組（8 個資料位元，MSB 先送），內容依應用而定，例如要寫入的暫存器數值。'});
+  }
+  frame4.push({cls:'ack', lvl:'A', lbl:'ACK', tag:'應答 ACK', color:'var(--amber)', desc:'裝置收到完整的資料位元組後，再把 SDA 拉低一次，確認「資料我收到了」。'});
+  frame4.push({cls:'stop', lvl:'P', lbl:'STOP', tag:'STOP', color:'var(--coral)', desc:'SCL 高電位時 SDA 上升，代表這次通訊結束，匯流排恢復閒置狀態。'});
+
+  var frameRow = document.getElementById('frameRow');
+  var frameDetail = document.getElementById('frameDetail');
+  frame4.forEach(function(seg){
+    var el = document.createElement('div');
+    el.className = 'seg '+seg.cls;
+    el.tabIndex = 0;
+    el.innerHTML = '<div class="lvl mono">'+seg.lvl+'</div><div class="lbl">'+seg.lbl+'</div>';
+    el.addEventListener('click', function(){
+      document.querySelectorAll('#frameRow .seg').forEach(function(x){ x.classList.remove('selected'); });
+      el.classList.add('selected');
+      frameDetail.innerHTML = '<span class="tag" style="background:'+seg.color+';color:var(--surface)">'+seg.tag+'</span><br>'+seg.desc;
+    });
+    frameRow.appendChild(el);
+  });
+
+  /* ---------------- Slide 5 : full simulate ---------------- */
+  var devices = [
+    {name:'OLED 顯示器', addr:0x3C},
+    {name:'即時時鐘 RTC', addr:0x68},
+    {name:'氣壓感測器', addr:0x76}
+  ];
+  var dataBytes = [0x01, 0x55, 0xFF];
+  var selDev = devices[0];
+  var selData = dataBytes[0];
+
+  var devRow = document.getElementById('devRow');
+  var dataRow = document.getElementById('dataRow');
+  var infoChips = document.getElementById('infoChips');
+  var waveSvg = document.getElementById('waveSvg');
+  var waveLabels = document.getElementById('waveLabels');
+  var nowStrip = document.getElementById('nowStrip');
+  var waveTimer = null;
+  var segsCache = null;
+  var stepIdx = -1;
+
+  function refreshInfoChips(){
+    var addrBin = selDev.addr.toString(2).padStart(7,'0');
+    var dataBin = selData.toString(2).padStart(8,'0');
+    infoChips.innerHTML =
+      '<div>目標位址：<b>0x'+selDev.addr.toString(16).toUpperCase()+'</b> = '+addrBin+'</div>'+
+      '<div>讀寫位元：<b>0（Write）</b></div>'+
+      '<div>資料位元組：<b>0x'+selData.toString(16).toUpperCase().padStart(2,'0')+'</b> = '+dataBin+'</div>';
+  }
+
+  devices.forEach(function(dv){
+    var b = document.createElement('button');
+    b.className = 'pick-btn'+(dv===selDev?' sel':'');
+    b.innerHTML = dv.name+'<span class="hex">0x'+dv.addr.toString(16).toUpperCase()+'</span>';
+    b.addEventListener('click', function(){
+      selDev = dv;
+      devRow.querySelectorAll('.pick-btn').forEach(function(x){ x.classList.remove('sel'); });
+      b.classList.add('sel');
+      refreshInfoChips();
+      if (waveTimer){ clearInterval(waveTimer); waveTimer=null; }
+      segsCache = buildI2CFrame(); stepIdx = -1;
+      drawI2CWave(segsCache);
+      nowStrip.innerHTML = '已選擇裝置 <b>'+selDev.name+'</b>，按「自動播放」或「下一步」開始交易。';
+    });
+    devRow.appendChild(b);
+  });
+  dataBytes.forEach(function(db){
+    var b = document.createElement('button');
+    b.className = 'pick-btn'+(db===selData?' sel':'');
+    b.innerHTML = '資料<span class="hex">0x'+db.toString(16).toUpperCase().padStart(2,'0')+'</span>';
+    b.addEventListener('click', function(){
+      selData = db;
+      dataRow.querySelectorAll('.pick-btn').forEach(function(x){ x.classList.remove('sel'); });
+      b.classList.add('sel');
+      refreshInfoChips();
+      if (waveTimer){ clearInterval(waveTimer); waveTimer=null; }
+      segsCache = buildI2CFrame(); stepIdx = -1;
+      drawI2CWave(segsCache);
+      nowStrip.innerHTML = '已選擇資料 <b>0x'+selData.toString(16).toUpperCase().padStart(2,'0')+'</b>，按「自動播放」或「下一步」開始交易。';
+    });
+    dataRow.appendChild(b);
+  });
+  refreshInfoChips();
+
+  function buildI2CFrame(){
+    var segs = [];
+    segs.push({kind:'start', v:1, label:'START'});
+    for (var a=6;a>=0;a--){ segs.push({kind:'bit', v:(selDev.addr>>a)&1, label:'A'+a}); }
+    segs.push({kind:'bit', v:0, label:'R/W'});
+    segs.push({kind:'ack', v:0, label:'ACK'});
+    for (var db=7;db>=0;db--){ segs.push({kind:'bit', v:(selData>>db)&1, label:'D'+db}); }
+    segs.push({kind:'ack', v:0, label:'ACK'});
+    segs.push({kind:'stop', v:1, label:'STOP'});
+    return segs;
+  }
+
+  function lanePath(segs, unit, laneHighY, laneLowY, mode){
+    var pts = [];
+    segs.forEach(function(seg,i){
+      var x0=i*unit, x1=(i+1)*unit;
+      if (mode==='scl'){
+        if (seg.kind==='start' || seg.kind==='stop'){
+          pts.push([x0,laneHighY]); pts.push([x1,laneHighY]);
+        } else {
+          var xm1=x0+unit*0.5, xm2=x0+unit*0.85;
+          pts.push([x0,laneLowY]); pts.push([xm1,laneLowY]); pts.push([xm1,laneHighY]); pts.push([xm2,laneHighY]); pts.push([xm2,laneLowY]); pts.push([x1,laneLowY]);
+        }
+      } else {
+        if (seg.kind==='start'){
+          var xm=x0+unit*0.35;
+          pts.push([x0,laneHighY]); pts.push([xm,laneHighY]); pts.push([xm,laneLowY]); pts.push([x1,laneLowY]);
+        } else if (seg.kind==='stop'){
+          var xm=x0+unit*0.35;
+          pts.push([x0,laneLowY]); pts.push([xm,laneLowY]); pts.push([xm,laneHighY]); pts.push([x1,laneHighY]);
+        } else {
+          var y = seg.v ? laneHighY : laneLowY;
+          pts.push([x0,y]); pts.push([x1,y]);
+        }
+      }
+    });
+    return pts.map(function(p,i){ return (i===0?'M':'L')+p[0]+' '+p[1]; }).join(' ');
+  }
+
+  function maskLabel(seg){
+    if (seg.kind==='start') return 'S';
+    if (seg.kind==='stop') return 'P';
+    if (seg.kind==='ack') return 'A';
+    return String(seg.v);
+  }
+
+  function drawI2CWave(segs, highlightIdx){
+    var w=760, h=170, unit=w/segs.length;
+    var sclHigh=20, sclLow=52;
+    var sdaHigh=96, sdaLow=128;
+    var parts = [
+      '<line x1="0" y1="'+sclHigh+'" x2="'+w+'" y2="'+sclHigh+'" stroke="var(--line)" stroke-dasharray="2 4"/>',
+      '<line x1="0" y1="'+sclLow+'" x2="'+w+'" y2="'+sclLow+'" stroke="var(--line)" stroke-dasharray="2 4"/>',
+      '<line x1="0" y1="'+sdaHigh+'" x2="'+w+'" y2="'+sdaHigh+'" stroke="var(--line)" stroke-dasharray="2 4"/>',
+      '<line x1="0" y1="'+sdaLow+'" x2="'+w+'" y2="'+sdaLow+'" stroke="var(--line)" stroke-dasharray="2 4"/>'
+    ];
+    for (var s=1;s<segs.length;s++){
+      var sx=s*unit;
+      parts.push('<line x1="'+sx+'" y1="6" x2="'+sx+'" y2="'+(h-6)+'" stroke="var(--muted)" stroke-opacity="0.3" stroke-dasharray="3 4"/>');
+    }
+    parts.push('<text x="4" y="'+(sclHigh-6)+'" font-family="JetBrains Mono" font-size="10" fill="var(--accent)">SCL</text>');
+    parts.push('<text x="4" y="'+(sdaHigh-6)+'" font-family="JetBrains Mono" font-size="10" fill="var(--amber-ink)">SDA</text>');
+    parts.push('<path class="wave-line scl" d="'+lanePath(segs,unit,sclHigh,sclLow,'scl')+'"/>');
+    parts.push('<path class="wave-line sda" d="'+lanePath(segs,unit,sdaHigh,sdaLow,'sda')+'"/>');
+    if (highlightIdx!==undefined && highlightIdx!==null){
+      var mx = highlightIdx*unit;
+      var fontSize = Math.min(unit,h)*0.42;
+      parts.push('<rect class="wave-mask" x="'+mx+'" y="0" width="'+unit+'" height="'+h+'"/>');
+      parts.push('<text class="wave-mask-text" x="'+(mx+unit/2)+'" y="'+(h/2)+'" text-anchor="middle" dominant-baseline="central" font-family="JetBrains Mono" font-size="'+fontSize+'">'+maskLabel(segs[highlightIdx])+'</text>');
+    }
+    waveSvg.setAttribute('viewBox','0 0 '+w+' '+h);
+    waveSvg.innerHTML = parts.join('');
+    waveLabels.innerHTML = segs.map(function(seg,i){
+      return '<span style="'+(i===highlightIdx?'color:var(--coral);font-weight:700':'')+'">'+seg.label+'</span>';
+    }).join('');
+  }
+
+  function labelForSeg(seg){
+    if (seg.kind==='start') return '<b>START 條件</b>：SCL 高電位時 SDA 下降，通訊開始';
+    if (seg.kind==='stop') return '<b>STOP 條件</b>：SCL 高電位時 SDA 上升，通訊結束';
+    if (seg.kind==='ack') return '<b>ACK 應答</b>：裝置把 SDA 拉低，表示成功收到';
+    if (seg.label.charAt(0)==='A') return '<b>位址位元 '+seg.label+'</b>：組成裝置位址 0x'+selDev.addr.toString(16).toUpperCase()+' 的其中一位';
+    if (seg.label==='R/W') return '<b>讀寫位元</b>：0 代表主機要「寫入」資料';
+    return '<b>資料位元 '+seg.label+'</b>：組成要寫入的位元組 0x'+selData.toString(16).toUpperCase().padStart(2,'0')+' 的其中一位';
+  }
+
+  function playI2C(){
+    if (waveTimer) clearInterval(waveTimer);
+    segsCache = buildI2CFrame();
+    var segs = segsCache;
+    var idx = 0;
+    stepIdx = 0;
+    drawI2CWave(segs, 0);
+    nowStrip.innerHTML = '目前：'+labelForSeg(segs[0]);
+    waveTimer = setInterval(function(){
+      idx++;
+      if (idx >= segs.length){
+        clearInterval(waveTimer);
+        waveTimer = null;
+        stepIdx = segs.length - 1;
+        drawI2CWave(segs);
+        nowStrip.innerHTML = '✅ 已送出完整的 I2C 寫入交易給 <b>'+selDev.name+'</b>！';
+        return;
+      }
+      stepIdx = idx;
+      drawI2CWave(segs, idx);
+      nowStrip.innerHTML = '目前：'+labelForSeg(segs[idx]);
+    }, 420);
+  }
+  segsCache = buildI2CFrame();
+  drawI2CWave(segsCache);
+  document.getElementById('sendI2C').addEventListener('click', playI2C);
+
+  function stepTo(newIdx){
+    if (waveTimer){ clearInterval(waveTimer); waveTimer = null; }
+    if (!segsCache) segsCache = buildI2CFrame();
+    stepIdx = Math.max(0, Math.min(segsCache.length - 1, newIdx));
+    drawI2CWave(segsCache, stepIdx);
+    nowStrip.innerHTML = '目前（第 '+(stepIdx+1)+' / '+segsCache.length+' 步）：'+labelForSeg(segsCache[stepIdx]);
+  }
+  document.getElementById('stepNext').addEventListener('click', function(){
+    stepTo(stepIdx < 0 ? 0 : stepIdx + 1);
+  });
+  document.getElementById('stepPrev').addEventListener('click', function(){
+    if (stepIdx <= 0){ stepTo(0); return; }
+    stepTo(stepIdx - 1);
+  });
+  document.getElementById('stepReset').addEventListener('click', function(){
+    if (waveTimer){ clearInterval(waveTimer); waveTimer = null; }
+    segsCache = buildI2CFrame();
+    stepIdx = -1;
+    drawI2CWave(segsCache);
+    nowStrip.innerHTML = '已重置，按「自動播放」或「下一步」重新開始。';
+  });
+
+  /* ---------------- Slide 6 : quiz ---------------- */
+  var quiz = [
+    {
+      q: '匯流排上不管接了幾個裝置，I2C 都只需要幾條訊號線？',
+      opts: ['固定 2 條（SDA + SCL）', '每多一個裝置就要多接一組線', '至少需要 4 條'],
+      correct: 0,
+      explain: '不管接多少裝置，全部共用同一組 SDA 與 SCL，靠位址分辨彼此，這也是 I2C 省接線的最大優點。'
+    },
+    {
+      q: 'SDA、SCL 為什麼一定要外接提升電阻？',
+      opts: ['因為裝置只能主動拉低，需要電阻把線拉回高電位', '為了防止短路', '為了降低耗電量'],
+      correct: 0,
+      explain: 'I2C 使用開洩極（open-drain）輸出，裝置只能把線拉低，沒辦法主動拉高，所以要靠提升電阻讓線路平時保持在高電位。'
+    },
+    {
+      q: 'I2C 是同步還是非同步協定？',
+      opts: ['同步：有共用的 SCL 時脈線', '非同步：跟 UART 一樣要先約定鮑率', '看裝置廠牌而定'],
+      correct: 0,
+      explain: 'I2C 有一條 SCL 時脈線，由主機產生節奏，讓收發雙方對齊同一個時間點，因此不需要像 UART 一樣事先講好速率。'
+    },
+    {
+      q: '裝置收到屬於自己的位址之後，通常會怎麼回應？',
+      opts: ['保持 SDA 高電位，不做任何事', '把 SDA 拉低，送出 ACK 表示收到', '直接把 SCL 線切斷'],
+      correct: 1,
+      explain: '裝置確認位址是自己的之後，會在第 9 個時脈把 SDA 拉低，做為 ACK（應答），告訴主機「我收到了」。'
+    }
+  ];
+  var quizList = document.getElementById('quizList');
+  var scorePill = document.getElementById('scorePill');
+  var score = 0;
+
+  function buildQuiz(){
+    quizList.innerHTML = '';
+    score = 0;
+    scorePill.textContent = '得分 0 / '+quiz.length;
+    quiz.forEach(function(item, qi){
+      var card = document.createElement('div');
+      card.className = 'q-card';
+      var optsHtml = item.opts.map(function(o,oi){ return '<button class="opt" data-oi="'+oi+'">'+o+'</button>'; }).join('');
+      card.innerHTML = '<div class="q-title">Q'+(qi+1)+'. '+item.q+'</div>'+
+        '<div class="opts">'+optsHtml+'</div>'+
+        '<div class="q-explain">💡 '+item.explain+'</div>';
+      var explainEl = card.querySelector('.q-explain');
+      card.querySelectorAll('.opt').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          if (card.dataset.locked) return;
+          card.dataset.locked = '1';
+          var oi = parseInt(btn.getAttribute('data-oi'),10);
+          card.querySelectorAll('.opt').forEach(function(o,i){
+            o.disabled = true;
+            if (i === item.correct) o.classList.add('correct');
+            else if (i === oi) o.classList.add('wrong');
+          });
+          if (oi === item.correct) score++;
+          explainEl.classList.add('show');
+          scorePill.textContent = '得分 '+score+' / '+quiz.length;
+        });
+      });
+      quizList.appendChild(card);
+    });
+  }
+  buildQuiz();
+  document.getElementById('resetQuiz').addEventListener('click', buildQuiz);
+
+})();
+</script>

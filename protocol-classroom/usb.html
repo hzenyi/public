@@ -1,0 +1,1589 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>USB 通訊小教室</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+  /* 版面概念：全螢幕翻頁式小教室，一頁一個概念，互動元件置中，底部固定導覽列。
+     沿用 UART 小教室的米色底、青綠主色與圓角卡片，讓兩堂課看起來是同一套教材。 */
+  :root{
+    --bg:#faf7ee;
+    --surface:#ffffff;
+    --surface-2:#eef6ee;
+    --ink:#233229;
+    --muted:#566a5d;
+    --line:#d9e5da;
+    --accent:#17766a;
+    --accent-soft:#dff3ee;
+    --accent-ink:#ffffff;
+    --amber:#eeab33;
+    --amber-soft:#fbe9c8;
+    --amber-ink:#3c2a04;
+    --amber-strong:#a35f00;
+    --on-amber:#3c2a04;
+    --coral:#c2463b;
+    --coral-soft:#fdeceb;
+    --blue:#2b6f9e;
+    --wire-red:#c23a3a;
+    --wire-green:#2b8a52;
+    --wire-black:#26302a;
+    --shadow:0 18px 40px -22px rgba(35,50,41,.35);
+    --font-ui:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    --font-display:"Baloo 2","Noto Sans TC","PingFang TC",sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141d18;
+      --surface:#1c2721;
+      --surface-2:#223028;
+      --ink:#eef5ee;
+      --muted:#9db3a4;
+      --line:#31413a;
+      --accent:#5fd0bd;
+      --accent-soft:#20423c;
+      --accent-ink:#0c2320;
+      --amber:#f2c369;
+      --amber-soft:#3d3013;
+      --amber-ink:#fdf3dd;
+      --amber-strong:#f2c369;
+      --coral:#f0958c;
+      --coral-soft:#402322;
+      --blue:#7cb8e0;
+      --wire-red:#e0645c;
+      --wire-green:#6fd08c;
+      --wire-black:#0b100d;
+      --shadow:0 18px 40px -20px rgba(0,0,0,.55);
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141d18;
+    --surface:#1c2721;
+    --surface-2:#223028;
+    --ink:#eef5ee;
+    --muted:#9db3a4;
+    --line:#31413a;
+    --accent:#5fd0bd;
+    --accent-soft:#20423c;
+    --accent-ink:#0c2320;
+    --amber:#f2c369;
+    --amber-soft:#3d3013;
+    --amber-ink:#fdf3dd;
+    --amber-strong:#f2c369;
+    --coral:#f0958c;
+    --coral-soft:#402322;
+    --blue:#7cb8e0;
+    --wire-red:#e0645c;
+    --wire-green:#6fd08c;
+    --wire-black:#0b100d;
+    --shadow:0 18px 40px -20px rgba(0,0,0,.55);
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-ui);
+    -webkit-font-smoothing:antialiased;
+  }
+  .latin{font-family:var(--font-display)}
+  .mono{font-family:var(--font-mono)}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  p{margin:0}
+  button{font-family:inherit;color:inherit}
+  table{border-collapse:collapse}
+
+  /* ---------- deck shell ---------- */
+  .deck{height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .progress-track{height:5px;background:var(--surface-2);flex:none}
+  .progress-fill{height:100%;width:8%;background:linear-gradient(90deg,var(--accent),var(--amber));transition:width .45s cubic-bezier(.65,0,.35,1)}
+  .slides{flex:1;position:relative;min-height:0}
+  .slide{
+    position:absolute;inset:0;
+    display:flex;justify-content:center;
+    padding-top:clamp(18px,4vw,36px);
+    padding-bottom:clamp(88px,11vh,116px);
+    padding-left:max(clamp(16px,5vw,64px),env(safe-area-inset-left,0px));
+    padding-right:max(clamp(16px,5vw,64px),env(safe-area-inset-right,0px));
+    opacity:0;transform:translateX(36px);
+    transition:opacity .45s ease,transform .45s ease;
+    pointer-events:none;overflow-y:auto;
+  }
+  .slide.leaving-back{transform:translateX(-36px)}
+  .slide.active{opacity:1;transform:translateX(0);pointer-events:auto}
+  .slide-inner{width:100%;max-width:920px;margin:auto;display:flex;flex-direction:column;gap:18px;min-width:0}
+
+  .eyebrow{
+    display:inline-flex;align-items:center;align-self:flex-start;
+    font-family:var(--font-display);font-size:13px;font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);background:var(--accent-soft);
+    padding:6px 14px;border-radius:999px;
+  }
+  .slide h2{font-size:clamp(24px,4vw,34px);font-weight:900;line-height:1.28}
+  .slide h2 .num{font-family:var(--font-display);color:var(--accent);margin-right:8px}
+  .lede{font-size:clamp(14.5px,2vw,16.5px);line-height:1.85;max-width:68ch}
+  .lede b{color:var(--accent);font-weight:700}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+  .hint{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;line-height:1.5}
+  .hint svg{flex:none}
+
+  /* ---------- nav ---------- */
+  .nav{
+    position:fixed;left:0;right:0;bottom:0;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    padding-top:12px;
+    padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+    background:linear-gradient(180deg,transparent,var(--bg) 40%);
+    pointer-events:none;
+  }
+  .nav>*{pointer-events:auto}
+  .nav-btn{
+    width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:var(--shadow);transition:transform .15s ease;flex:none;
+  }
+  .nav-btn:hover{transform:translateY(-2px)}
+  .nav-btn:disabled{opacity:.35;cursor:default;transform:none}
+  .dots{display:flex;gap:6px;padding:0 4px;flex-wrap:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--line);border:none;cursor:pointer;transition:all .25s ease;padding:0;flex:none}
+  .dot.on{width:22px;background:var(--accent);border-radius:6px}
+  button:focus-visible,summary:focus-visible,.pin:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+  .cta{
+    align-self:flex-start;display:inline-flex;align-items:center;gap:10px;
+    background:var(--accent);color:var(--accent-ink);border:none;
+    padding:12px 22px;border-radius:999px;font-size:14.5px;font-weight:700;cursor:pointer;
+    box-shadow:var(--shadow);transition:transform .15s ease;
+  }
+  .cta:hover{transform:translateY(-2px)}
+  .cta.secondary{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+  .cta.small{padding:9px 18px;font-size:13.5px}
+  .cta:disabled{opacity:.4;cursor:default;transform:none}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+
+  /* ============ SLIDE 0 ============ */
+  .s0-inner{align-items:center;text-align:center;gap:24px}
+  .s0-badge{width:96px;height:96px;border-radius:26px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center}
+  .s0-title{font-size:clamp(34px,7vw,58px);font-weight:900;line-height:1.15}
+  .s0-title .latin{color:var(--accent);font-weight:800}
+  .s0-sub{font-size:clamp(14.5px,2.2vw,17px);color:var(--muted);max-width:52ch;line-height:1.8}
+  .s0-sub b{color:var(--ink)}
+  .pair-strip{width:min(520px,92%);height:84px}
+  .pair-strip path{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+  .p-dp{stroke:var(--accent)}
+  .p-dm{stroke:var(--amber-strong)}
+  .s0-tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .s0-tag{font-family:var(--font-display);font-size:12.5px;font-weight:700;letter-spacing:.03em;padding:7px 14px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
+
+  /* ============ key points / summary ============ */
+  .sum-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  @media (max-width:600px){.sum-grid{grid-template-columns:1fr}}
+  .sum-item{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.65;min-width:0}
+  .sum-item svg{flex:none;margin-top:2px}
+  .sum-item b{display:block;font-size:14px;margin-bottom:2px}
+  .thanks-note{background:var(--surface-2);border-radius:16px;padding:16px 18px;font-size:13.5px;line-height:1.85}
+
+  /* ============ flip cards ============ */
+  .letters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .flip-card{perspective:1000px;height:150px;cursor:pointer;background:transparent;border:none;padding:0}
+  .flip-inner{position:relative;width:100%;height:100%;transition:transform .55s cubic-bezier(.65,0,.35,1);transform-style:preserve-3d}
+  .flip-card.flipped .flip-inner{transform:rotateY(180deg)}
+  .flip-face{position:absolute;inset:0;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;backface-visibility:hidden;padding:10px;text-align:center;border:1px solid var(--line)}
+  .flip-front{background:var(--surface);box-shadow:var(--shadow)}
+  .flip-front .big{font-family:var(--font-display);font-size:42px;font-weight:800;color:var(--accent)}
+  .flip-front .small{font-size:12px;color:var(--muted);margin-top:2px}
+  .flip-back{background:var(--accent);color:var(--accent-ink);transform:rotateY(180deg)}
+  .flip-back .word{font-family:var(--font-display);font-weight:700;font-size:14px}
+  .flip-back .desc{font-size:12px;margin-top:6px;line-height:1.55}
+  @media (max-width:420px){.flip-back .desc{font-size:11px}.flip-card{height:168px}}
+
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+  .cmp{width:100%;min-width:480px;font-size:13px}
+  .cmp th,.cmp td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);line-height:1.6;vertical-align:top}
+  .cmp th{background:var(--surface-2);font-size:12px;color:var(--muted);font-weight:700}
+  .cmp tr:last-child td{border-bottom:none}
+  .cmp td:first-child{font-weight:700;white-space:nowrap}
+
+  /* ============ wires ============ */
+  .board-wrap{display:flex;justify-content:center}
+  .board-svg{width:100%;max-width:580px;height:auto}
+  .box-rect{fill:var(--surface);stroke:var(--line);stroke-width:2}
+  .box-title{font-family:var(--font-display);font-weight:700;font-size:15px;fill:var(--ink);text-anchor:middle}
+  .wo{fill:none;stroke:var(--muted);stroke-width:6;stroke-linecap:round}
+  .wi{fill:none;stroke-width:3;stroke-linecap:round}
+  .w-vbus .wi{stroke:var(--wire-red)}
+  .w-dm .wi{stroke:#ffffff}
+  .w-dp .wi{stroke:var(--wire-green)}
+  .w-gnd .wi{stroke:var(--wire-black)}
+  .w-ss{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round}
+  .w-drain{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:4 4;stroke-linecap:round}
+  .pin{cursor:pointer}
+  .pin rect{transition:filter .2s ease}
+  .pin:hover rect,.pin.active rect{filter:brightness(1.15)}
+  .pin.active rect{stroke:var(--ink);stroke-width:2}
+  .pin text{font-family:var(--font-display);font-weight:700;font-size:11px;text-anchor:middle}
+  .t-vbus rect{fill:var(--wire-red)} .t-vbus text{fill:#fff}
+  .t-dm rect{fill:#fff;stroke:var(--muted);stroke-width:1.5} .t-dm text{fill:#233229}
+  .t-dp rect{fill:var(--wire-green)} .t-dp text{fill:#fff}
+  .t-gnd rect{fill:var(--wire-black);stroke:var(--muted);stroke-width:1.5} .t-gnd text{fill:#fff}
+  .t-ss rect{fill:var(--blue)} .t-ss text{fill:#fff}
+  .t-drain rect{fill:var(--muted)} .t-drain text{fill:var(--surface)}
+  @keyframes flow{to{stroke-dashoffset:-28}}
+  .board-svg.live .w-vbus .wi{stroke-dasharray:7 7;animation:flow .8s linear infinite}
+  [hidden]{display:none!important}
+  .pin-info{min-height:64px;background:var(--surface-2);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.75}
+  .pin-info b{color:var(--accent)}
+
+  /* ============ differential demo ============ */
+  .plot-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;overflow-x:auto}
+  .plot-card svg{display:block;min-width:560px;width:100%;height:auto}
+  .ax{font-family:var(--font-mono);font-size:11px;fill:var(--muted)}
+  .ttl{font-family:var(--font-ui);font-size:12.5px;font-weight:700;fill:var(--ink)}
+  .bitlab{font-family:var(--font-mono);font-size:13px;font-weight:700;fill:var(--ink);text-anchor:middle}
+  .bnd{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4;fill:none}
+  .grid-l{stroke:var(--line);stroke-width:1;fill:none}
+  .thr{stroke:var(--coral);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
+  .dtrace{fill:none;stroke-width:2;stroke-linejoin:round}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .legend i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+  .slider-row{display:flex;flex-direction:column;gap:6px}
+  .slider-row .lab{display:flex;justify-content:space-between;font-size:13px;gap:10px;flex-wrap:wrap}
+  .slider-row .lab b{font-family:var(--font-mono);color:var(--accent)}
+  input[type=range]{width:100%;accent-color:var(--accent);height:6px}
+  .bit-compare{display:flex;flex-direction:column;gap:8px}
+  .bit-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .bit-row .row-label{font-size:12.5px;color:var(--muted);width:128px;flex:none}
+  .bits{display:flex;gap:5px;flex-wrap:wrap}
+  .bit{width:30px;height:30px;border-radius:8px;background:var(--surface);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:14px}
+  .bit.bad{border-color:var(--coral);background:var(--coral-soft);color:var(--coral)}
+  .result-box{background:var(--surface-2);border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.75}
+
+  /* ============ NRZI simulation ============ */
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{min-width:64px;padding:8px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font-family:var(--font-mono);font-weight:700;font-size:14px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .chip small{font-family:var(--font-ui);font-weight:400;font-size:10.5px;color:var(--muted)}
+  .chip.sel{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .chip.sel small{color:var(--accent-ink)}
+  .wave-wrap{background:var(--surface-2);border-radius:16px;padding:14px}
+  .wave-scroll{overflow-x:auto}
+  .wave-grid{display:grid;grid-template-columns:56px minmax(0,1fr);column-gap:8px;row-gap:4px;align-items:center}
+  .wg-label{font-size:11.5px;color:var(--muted);font-weight:700}
+  .wg-plotlabel{position:relative;height:150px}
+  .wg-plotlabel span{position:absolute;left:0;font-family:var(--font-mono);font-size:12px;font-weight:700}
+  .lab-dp{top:26px;color:var(--accent)}
+  .lab-dm{top:104px;color:var(--amber-strong)}
+  .wg-plot{position:relative;height:150px}
+  .wg-plot svg{position:absolute;inset:0;width:100%;height:150px;display:block}
+  .wg-plot svg path,.wg-plot svg line{vector-effect:non-scaling-stroke}
+  .hl{position:absolute;top:0;bottom:0;background:var(--amber);opacity:.28;border-radius:6px;pointer-events:none;display:none}
+  .wg-cells{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+  .wg-cells span{text-align:center;font-family:var(--font-mono);font-size:12px;padding:3px 0;border-radius:6px;white-space:nowrap}
+  .wg-cells.lbl span{font-family:var(--font-ui);font-size:10.5px;color:var(--muted)}
+  .wg-cells span.on{background:var(--amber-soft);color:var(--amber-ink);font-weight:700}
+  .wg-cells span.stuff{color:var(--coral);font-weight:700}
+  .now-strip{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.7;min-height:48px}
+  .now-strip b{color:var(--accent)}
+  .info-pills{display:flex;gap:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:12.5px}
+  .info-pills div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+
+  /* ============ packets ============ */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{padding:9px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font-size:13.5px;font-weight:700}
+  .tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .pkt-row{display:flex;gap:4px;overflow-x:auto;padding:8px 2px 10px}
+  .pseg{flex:1 1 0;min-width:66px;height:78px;border-radius:12px;border:2px solid var(--c);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:4px;transition:transform .15s ease}
+  .pseg .pn{font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--c)}
+  .pseg .ps{font-size:10.5px;color:var(--muted);text-align:center;line-height:1.3}
+  .pseg.sel{transform:translateY(-5px);box-shadow:var(--shadow)}
+  .k-sync{--c:var(--coral)} .k-pid{--c:var(--accent)} .k-field{--c:var(--blue)} .k-crc{--c:var(--amber-strong)} .k-eop{--c:var(--coral)}
+  .detail-box{background:var(--surface-2);border-radius:16px;padding:16px 18px;font-size:13.5px;line-height:1.8;min-height:92px}
+  .detail-box .tag{font-family:var(--font-display);font-weight:700;font-size:12.5px;letter-spacing:.04em;display:inline-block;margin-bottom:6px;padding:3px 10px;border-radius:999px;background:var(--c,var(--accent));color:var(--surface)}
+  .tx-list{display:flex;flex-direction:column;gap:8px}
+  .tx-step{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;animation:rise .4s ease both;animation-delay:var(--d,0s)}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .tx-dir{font-family:var(--font-display);font-weight:700;font-size:12px;padding:5px 10px;border-radius:999px;white-space:nowrap}
+  .tx-dir.host{background:var(--accent-soft);color:var(--accent)}
+  .tx-dir.dev{background:var(--amber-soft);color:var(--amber-ink)}
+  .tx-body{font-size:13.5px;line-height:1.6;min-width:0}
+  .tx-body b{font-family:var(--font-mono)}
+  .tx-note{font-size:12.5px;color:var(--muted);line-height:1.7}
+
+  /* ============ enumeration ============ */
+  .state-row{display:flex;gap:6px;flex-wrap:wrap}
+  .state-pill{padding:7px 12px;border-radius:999px;font-family:var(--font-display);font-weight:700;font-size:12.5px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted)}
+  .state-pill.done{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+  .state-pill.now{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .enum-card{padding:18px;display:flex;flex-direction:column;gap:14px}
+  .enum-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .enum-title{font-size:16px;font-weight:900}
+  .enum-count{font-family:var(--font-mono);font-size:12.5px;color:var(--muted)}
+  .enum-flow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center}
+  .node{border-radius:14px;padding:12px 10px;text-align:center;font-weight:700;font-size:13.5px;border:1.5px solid var(--line);background:var(--surface-2);line-height:1.4}
+  .node small{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
+  .msgs{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .msg{font-size:13px;line-height:1.6;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);min-width:0}
+  .msg.r{border-left:4px solid var(--accent)}
+  .msg.l{border-right:4px solid var(--amber-strong);text-align:right}
+  .addr-box{font-size:13px;display:flex;gap:8px;align-items:baseline}
+  .addr-box b{font-family:var(--font-mono);font-size:18px;color:var(--accent)}
+  .enum-note{background:var(--surface-2);border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.8}
+  @media (max-width:520px){.enum-flow{grid-template-columns:1fr}.msg.l{text-align:left}}
+
+  /* ============ transfer types ============ */
+  .tcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  @media (max-width:640px){.tcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .tcard{border:1.5px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+  .tcard .tn{font-size:18px;font-weight:900}
+  .tcard .te{font-family:var(--font-display);font-size:12px;color:var(--muted);font-weight:700}
+  .tcard[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow)}
+  .tcard[aria-pressed="true"] .te{color:var(--accent-ink)}
+  .tdetail{padding:16px 18px;display:grid;gap:10px}
+  .tdetail .one{font-size:15px;font-weight:700}
+  .tdl{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px 12px;font-size:13.5px;line-height:1.65;margin:0}
+  .tdl dt{color:var(--muted);font-weight:700;font-size:12.5px}
+  .tdl dd{margin:0}
+  @media (max-width:480px){.tdl{grid-template-columns:1fr;gap:2px}.tdl dd{margin-bottom:8px}}
+  .frame-bar{display:flex;gap:3px;height:46px}
+  .frame-bar div{border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--muted);border:1.5px solid var(--line);transition:all .25s ease;min-width:0;padding:0 4px;text-align:center;line-height:1.2}
+  .frame-bar div.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+  /* ============ speed ============ */
+  .speed-panel{padding:20px;display:flex;flex-direction:column;gap:16px}
+  .sp-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .sp-head .val{font-family:var(--font-display);font-size:clamp(30px,5vw,44px);font-weight:800;color:var(--accent)}
+  .sp-head .unit{font-size:13.5px;color:var(--muted)}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .stat{background:var(--surface-2);border-radius:14px;padding:12px 14px;min-width:0}
+  .stat .k{font-size:11.5px;color:var(--muted)}
+  .stat .v{font-family:var(--font-mono);font-weight:700;font-size:16px;margin-top:2px;overflow-wrap:anywhere}
+  .bars{display:flex;flex-direction:column;gap:6px}
+  .bar-btn{display:grid;grid-template-columns:minmax(86px,128px) minmax(0,1fr) 64px;gap:10px;align-items:center;background:transparent;border:1.5px solid transparent;border-radius:10px;padding:4px 6px;cursor:pointer;text-align:left;font-size:12.5px}
+  .bar-btn .track{height:12px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+  .bar-btn .fill{display:block;height:100%;border-radius:999px;background:var(--line);transition:background .2s ease}
+  .bar-btn .rt{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);text-align:right}
+  .bar-btn.sel{border-color:var(--accent);background:var(--accent-soft)}
+  .bar-btn.sel .fill{background:var(--accent)}
+  .size-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px}
+
+  /* ============ quiz ============ */
+  .quiz-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .score-pill{font-family:var(--font-display);font-weight:700;font-size:13px;background:var(--amber-soft);color:var(--amber-ink);padding:6px 14px;border-radius:999px}
+  .q-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+  .q-title{font-weight:700;font-size:14.5px;line-height:1.6}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{text-align:left;padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface-2);cursor:pointer;font-size:13.5px;line-height:1.55}
+  .opt.correct{border-color:var(--accent);background:var(--accent-soft)}
+  .opt.wrong{border-color:var(--coral);background:var(--coral-soft)}
+  .opt:disabled{cursor:default}
+  .q-explain{font-size:12.5px;color:var(--muted);line-height:1.7;display:none}
+  .q-explain.show{display:block}
+
+  /* ============ common mistakes ============ */
+  .mistakes{border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+  .mistakes summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;font-weight:700;font-size:14px;border-radius:16px}
+  .mistakes summary::-webkit-details-marker{display:none}
+  .mistakes summary .chev{margin-left:auto;transition:transform .2s ease;flex:none}
+  .mistakes[open] summary .chev{transform:rotate(180deg)}
+  .m-list{margin:0;padding:2px 14px 14px;list-style:none;display:grid;gap:10px}
+  .m-item{background:var(--surface-2);border-radius:12px;padding:12px 14px;display:grid;gap:6px;font-size:13px;line-height:1.7}
+  .m-line{display:flex;gap:10px;align-items:baseline;margin:0}
+  .m-line span:last-child{min-width:0}
+  .m-tag{flex:none;font-size:11.5px;font-weight:700;padding:1px 9px;border-radius:999px;white-space:nowrap}
+  .m-tag.bad{background:var(--coral-soft);color:var(--coral)}
+  .m-tag.eg{background:var(--amber-soft);color:var(--amber-ink)}
+  .m-tag.ok{background:var(--accent-soft);color:var(--accent)}
+
+  /* ============ glossary ============ */
+  .hint.note{display:block}
+  .term{font:inherit;color:inherit;background:none;border:none;padding:0;margin:0;cursor:help;text-align:inherit;border-bottom:2px dotted var(--accent);border-radius:2px}
+  .term:hover{background:var(--accent-soft)}
+  .tip{position:absolute;z-index:30;background:var(--surface);color:var(--ink);border:1.5px solid var(--accent);border-radius:14px;padding:12px 14px;font-size:13.5px;line-height:1.75;box-shadow:var(--shadow);max-width:340px}
+  .tip b{color:var(--accent)}
+  .gloss{border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+  .gloss summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;font-weight:700;font-size:14px;border-radius:16px}
+  .gloss summary::-webkit-details-marker{display:none}
+  .gloss summary .chev{margin-left:auto;transition:transform .2s ease;flex:none}
+  .gloss[open] summary .chev{transform:rotate(180deg)}
+  .gloss-body{padding:0 14px 14px;display:grid;gap:10px}
+  .gchips{display:flex;flex-wrap:wrap;gap:6px}
+  .gchip{border:1.5px solid var(--line);background:var(--surface-2);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer}
+  .gchip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .gpanel{background:var(--surface-2);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.8;min-height:58px}
+  .gpanel b{color:var(--accent)}
+  .gpanel .dim{color:var(--muted)}
+
+  @media (prefers-reduced-motion:reduce){
+    .slide,.flip-inner,.cta,.nav-btn,.progress-fill,.tx-step,.mistakes summary .chev{transition:none!important;animation:none!important}
+    .board-svg.live .w-vbus .wi{animation:none!important}
+  }
+</style>
+
+<div class="deck" id="deck">
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="slides" id="slides">
+
+    <!-- ===== 0 封面 ===== -->
+    <section class="slide" data-i="0">
+      <div class="slide-inner s0-inner">
+        <div class="s0-badge">
+          <svg width="56" height="56" viewBox="0 0 52 52" fill="none" aria-hidden="true">
+            <rect x="4" y="4" width="44" height="44" rx="12" fill="var(--accent-soft)"/>
+            <rect x="14" y="11" width="24" height="16" rx="3" stroke="var(--accent)" stroke-width="3" fill="none"/>
+            <rect x="19.5" y="16" width="4" height="4" fill="var(--accent)"/>
+            <rect x="28.5" y="16" width="4" height="4" fill="var(--accent)"/>
+            <path d="M26 27v7q0 4 4 4h6" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="eyebrow">電路設計課 · CIRCUIT DESIGN</div>
+        <h1 class="s0-title"><span class="latin">USB</span> 通訊協定</h1>
+        <p class="s0-sub">一次搞懂 USB 的<b>四條線、差動訊號、NRZI 編碼、封包、列舉與四種傳輸類型</b>，並實際看看一個位元組怎麼被送上線。</p>
+        <svg class="pair-strip" id="pairStrip" viewBox="0 0 520 84" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="s0-tags">
+          <span class="s0-tag latin">D+ / D−</span>
+          <span class="s0-tag latin">ENUMERATION</span>
+          <span class="s0-tag">四種傳輸類型</span>
+        </div>
+        <button class="cta" id="startBtn" type="button">開始上課
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 8h8M8 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== 1 本堂重點 ===== -->
+    <section class="slide" data-i="1">
+      <div class="slide-inner">
+        <div class="eyebrow">本堂重點 · KEY POINTS</div>
+        <h2>這一堂你要帶走的 6 件事</h2>
+        <p class="lede">先看結論，後面每一頁都會用小實驗帶你確認。每個概念頁的底部還附了三個學生最常搞錯的地方，各配一個實際例子。文中有虛線底線的名詞可以直接點開看解釋，每一頁也有「名詞小卡」，把第一次出現的名詞先講清楚。</p>
+        <div class="sum-grid" id="keyPoints"></div>
+      </div>
+    </section>
+
+    <!-- ===== 2 什麼是 USB ===== -->
+    <section class="slide" data-i="2">
+      <div class="slide-inner">
+        <div class="eyebrow">01 · 認識 USB</div>
+        <h2><span class="num latin">01</span>什麼是 USB？</h2>
+        <p class="lede"><span class="latin" style="font-weight:700;color:var(--accent)">USB</span>（Universal Serial Bus，通用序列匯流排）是電腦與周邊之間最常見的有線連接標準，滑鼠、鍵盤、隨身碟、手機充電、Arduino 燒錄都靠它。和 UART 最大的差別是<b>主從式</b>：所有通訊都由<b>主機（Host）</b>發起，<b>裝置（Device）</b>只能被問了才回答。一個 Host 最多可管理 127 個裝置，靠集線器（Hub）用樹狀方式擴充。</p>
+        <div class="letters" id="letters"></div>
+        <p class="hint"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M7 6.2V10M7 4v.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>點一下卡片，看看 U、S、B 各代表什麼</p>
+        <div class="tbl-wrap">
+          <table class="cmp">
+            <thead><tr><th>項目</th><th>UART（上一堂）</th><th>USB 2.0</th></tr></thead>
+            <tbody>
+              <tr><td>角色</td><td>雙方對等，誰都能先講</td><td>Host 主導，Device 只能回應</td></tr>
+              <tr><td>訊號線</td><td>TX、RX（單端）</td><td>D+、D−（差動，輪流收發）</td></tr>
+              <tr><td>時脈</td><td>沒有，靠雙方約定鮑率</td><td>沒有獨立時脈線，時脈藏在資料裡</td></tr>
+              <tr><td>供電</td><td>不供電</td><td>VBUS 供應 5 V</td></tr>
+              <tr><td>熱插拔</td><td>沒有辨識機制</td><td>有，靠「列舉」辨識裝置</td></tr>
+              <tr><td>速度</td><td>常見 9600 ~ 115200 bps</td><td>1.5 / 12 / 480 Mbps</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mistakes-slot" data-key="what"></div>
+      </div>
+    </section>
+
+    <!-- ===== 3 接腳 ===== -->
+    <section class="slide" data-i="3">
+      <div class="slide-inner">
+        <div class="eyebrow">02 · 線材與接腳</div>
+        <h2><span class="num latin">02</span>USB 的四條線</h2>
+        <p class="lede">USB 2.0 的線材只有四條：<b>VBUS</b>（+5 V 電源，紅）、<b>D−</b>（資料負端，白）、<b>D+</b>（資料正端，綠）、<b>GND</b>（接地，黑）。電源和資料走同一條線，所以插上去就能供電又能通訊。裝置在完成設定前最多取用 100 mA，設定後最多可申請 500 mA。</p>
+        <div class="board-wrap">
+          <svg class="board-svg" id="boardSvg" viewBox="0 0 520 176" role="img" aria-label="Host 與 Device 之間的 USB 線路圖">
+            <rect class="box-rect" id="hostRect" x="20" y="16" width="150" height="150" rx="16"/>
+            <rect class="box-rect" id="devRect" x="350" y="16" width="150" height="150" rx="16"/>
+            <text class="box-title" x="95" y="42">Host（電腦）</text>
+            <text class="box-title" x="425" y="42">Device（裝置）</text>
+
+            <g class="w-vbus"><path class="wo" d="M170 70H350"/><path class="wi" d="M170 70H350"/></g>
+            <g class="w-dm"><path class="wo" d="M170 98H350"/><path class="wi" d="M170 98H350"/></g>
+            <g class="w-dp"><path class="wo" d="M170 126H350"/><path class="wi" d="M170 126H350"/></g>
+            <g class="w-gnd"><path class="wo" d="M170 154H350"/><path class="wi" d="M170 154H350"/></g>
+
+            <g class="pin t-vbus" data-pin="vbus" tabindex="0" role="button" aria-label="VBUS 接腳" transform="translate(126,60)"><rect width="44" height="20" rx="6"/><text x="22" y="14">VBUS</text></g>
+            <g class="pin t-dm" data-pin="dm" tabindex="0" role="button" aria-label="D− 接腳" transform="translate(126,88)"><rect width="44" height="20" rx="6"/><text x="22" y="14">D−</text></g>
+            <g class="pin t-dp" data-pin="dp" tabindex="0" role="button" aria-label="D+ 接腳" transform="translate(126,116)"><rect width="44" height="20" rx="6"/><text x="22" y="14">D+</text></g>
+            <g class="pin t-gnd" data-pin="gnd" tabindex="0" role="button" aria-label="GND 接腳" transform="translate(126,144)"><rect width="44" height="20" rx="6"/><text x="22" y="14">GND</text></g>
+            <g class="pin t-vbus" data-pin="vbus" tabindex="0" role="button" aria-label="VBUS 接腳" transform="translate(350,60)"><rect width="44" height="20" rx="6"/><text x="22" y="14">VBUS</text></g>
+            <g class="pin t-dm" data-pin="dm" tabindex="0" role="button" aria-label="D− 接腳" transform="translate(350,88)"><rect width="44" height="20" rx="6"/><text x="22" y="14">D−</text></g>
+            <g class="pin t-dp" data-pin="dp" tabindex="0" role="button" aria-label="D+ 接腳" transform="translate(350,116)"><rect width="44" height="20" rx="6"/><text x="22" y="14">D+</text></g>
+            <g class="pin t-gnd" data-pin="gnd" tabindex="0" role="button" aria-label="GND 接腳" transform="translate(350,144)"><rect width="44" height="20" rx="6"/><text x="22" y="14">GND</text></g>
+
+            <g id="ss3" hidden>
+              <path class="w-ss" d="M170 182H350"/><path class="w-ss" d="M170 192H350"/>
+              <path class="w-ss" d="M170 210H350"/><path class="w-ss" d="M170 220H350"/>
+              <path class="w-drain" d="M170 240H350"/>
+              <g class="pin t-ss" data-pin="sstx" tabindex="0" role="button" aria-label="SSTX 接腳" transform="translate(118,177)"><rect width="52" height="20" rx="6"/><text x="26" y="14">SSTX±</text></g>
+              <g class="pin t-ss" data-pin="ssrx" tabindex="0" role="button" aria-label="SSRX 接腳" transform="translate(118,205)"><rect width="52" height="20" rx="6"/><text x="26" y="14">SSRX±</text></g>
+              <g class="pin t-drain" data-pin="drain" tabindex="0" role="button" aria-label="GND_DRAIN 接腳" transform="translate(118,230)"><rect width="52" height="20" rx="6"/><text x="26" y="14">GND_D</text></g>
+              <g class="pin t-ss" data-pin="ssrx" tabindex="0" role="button" aria-label="SSRX 接腳" transform="translate(350,177)"><rect width="52" height="20" rx="6"/><text x="26" y="14">SSRX±</text></g>
+              <g class="pin t-ss" data-pin="sstx" tabindex="0" role="button" aria-label="SSTX 接腳" transform="translate(350,205)"><rect width="52" height="20" rx="6"/><text x="26" y="14">SSTX±</text></g>
+              <g class="pin t-drain" data-pin="drain" tabindex="0" role="button" aria-label="GND_DRAIN 接腳" transform="translate(350,230)"><rect width="52" height="20" rx="6"/><text x="26" y="14">GND_D</text></g>
+            </g>
+          </svg>
+        </div>
+        <div class="pin-info" id="pinInfo" aria-live="polite">點一下上面任一個接腳，看看它的功用；也可以按下面的按鈕。</div>
+        <div class="btn-row">
+          <button class="cta" id="plugBtn" type="button">插入裝置：看看供電</button>
+          <button class="cta secondary" id="modeBtn" type="button">看看 USB 3.0 Type-A（多 5 條線）</button>
+        </div>
+        <div class="mistakes-slot" data-key="wires"></div>
+      </div>
+    </section>
+
+    <!-- ===== 4 差動訊號 ===== -->
+    <section class="slide" data-i="4">
+      <div class="slide-inner">
+        <div class="eyebrow">03 · 差動訊號</div>
+        <h2><span class="num latin">03</span>為什麼要用 D+ 和 D−？</h2>
+        <p class="lede">USB 2.0 不看單一條線的電壓，而是看<b>D+ 減 D− 的差</b>。外界雜訊（馬達、手機電磁波）會同時打在兩條緊貼的線上，相減之後就<b>抵消</b>了。拉動雜訊滑桿，比較「只看 D+」和「看 D+ − D−」的判讀結果。</p>
+        <div class="slider-row">
+          <div class="lab"><label for="noiseSlider">雜訊強度（同時加在 D+ 與 D− 上）</label><b id="noiseVal">2.0 V</b></div>
+          <input type="range" id="noiseSlider" min="0" max="30" step="1" value="22">
+        </div>
+        <div class="plot-card"><svg id="diffSvg" viewBox="0 0 640 316" role="img" aria-label="加入雜訊後 D+、D− 與差動訊號的波形比較"></svg></div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>D+</span><span><i style="background:var(--amber-strong)"></i>D−</span><span><i style="background:var(--coral)"></i>單端判斷門檻 1.65 V</span></div>
+        <div class="bit-compare">
+          <div class="bit-row"><span class="row-label">Host 送出的位元</span><div class="bits" id="dBitsOrig"></div></div>
+          <div class="bit-row"><span class="row-label">只看 D+ 的判讀</span><div class="bits" id="dBitsSingle"></div></div>
+          <div class="bit-row"><span class="row-label">看 D+ − D− 的判讀</span><div class="bits" id="dBitsDiff"></div></div>
+        </div>
+        <div class="result-box" id="diffResult" aria-live="polite"></div>
+        <div class="mistakes-slot" data-key="diff"></div>
+      </div>
+    </section>
+
+    <!-- ===== 5 NRZI ===== -->
+    <section class="slide" data-i="5">
+      <div class="slide-inner">
+        <div class="eyebrow">04 · 編碼模擬</div>
+        <h2><span class="num latin">04</span>資料怎麼送上線：NRZI 與位元填充</h2>
+        <p class="lede">USB 沒有獨立的時脈線，接收端得從資料本身找節奏。做法是 <b>NRZI 編碼</b>：差動線有兩種狀態，叫 <b>J 與 K</b>。傳 <b>0</b> 時狀態翻轉，傳 <b>1</b> 時維持不變，線路閒置時停在 J。連續太多個 1 就沒有翻轉，所以每連續六個 1 之後要強制插入一個 0（SYNC 最後那個 1 也要算進去），這叫<b>位元填充</b>。資料從最低位元（LSB）先送。封包以 <b>SYNC</b> 開頭、以 <b>EOP</b> 結尾，EOP 的主體是 SE0（D+、D− 同時拉低），要維持 2 個位元時間。選一個位元組，按「送出」逐格播放。文中有虛線底線的字可以點，下面的名詞小卡也能查。</p>
+        <div class="chip-row" id="byteRow"></div>
+        <div class="btn-row"><button class="cta" id="nrziPlay" type="button">送出 ▶</button></div>
+        <div class="wave-wrap">
+          <div class="wave-scroll">
+            <div class="wave-grid" id="nrziBox">
+              <div class="wg-plotlabel"><span class="lab-dp">D+</span><span class="lab-dm">D−</span></div>
+              <div class="wg-plot"><svg id="nrziSvg" preserveAspectRatio="none" role="img" aria-label="NRZI 波形"></svg><div class="hl" id="nrziHl"></div></div>
+              <div class="wg-label">線路狀態</div><div class="wg-cells" id="nrziState"></div>
+              <div class="wg-label">位元值</div><div class="wg-cells" id="nrziBit"></div>
+              <div class="wg-label">欄位</div><div class="wg-cells lbl" id="nrziLabel"></div>
+            </div>
+          </div>
+        </div>
+        <div class="now-strip" id="nrziNow" aria-live="polite">尚未送出資料。波形最前面是閒置的 J，接著是固定的 SYNC，然後是你選的位元組，最後以 EOP 結束。這是簡化示範，真正的封包還有其他欄位，下一頁再說明。</div>
+        <div class="info-pills" id="nrziInfo"></div>
+        <div class="mistakes-slot" data-key="nrzi"></div>
+      </div>
+    </section>
+
+    <!-- ===== 6 封包 ===== -->
+    <section class="slide" data-i="6">
+      <div class="slide-inner">
+        <div class="eyebrow">05 · 封包與交易</div>
+        <h2><span class="num latin">05</span>封包（Packet）與交易</h2>
+        <p class="lede">USB 的資料會包成<b>封包（Packet）</b>，每個封包都以 SYNC 開頭、以 EOP 結尾（上一頁看過了）。Host 完成一件事，叫一次<b>交易（Transaction）</b>，通常由三個封包組成：<b>Token</b>（Host 說要做什麼）→ <b>Data</b>（資料）→ <b>Handshake</b>（回報結果）。每個封包用 <b>PID</b> 說明自己是哪一種，Token 還會指定對象：哪個<b>位址</b>的裝置、哪個<b>端點</b>。先選封包類型，再點方塊看每個欄位的意義。文中有虛線底線的字可以點，下面的名詞小卡也能查。</p>
+        <div class="tabs" id="pktTabs">
+          <button class="tab" type="button" data-k="token" aria-pressed="true">Token 封包</button>
+          <button class="tab" type="button" data-k="data" aria-pressed="false">Data 封包</button>
+          <button class="tab" type="button" data-k="hand" aria-pressed="false">Handshake 封包</button>
+        </div>
+        <div class="pkt-row" id="pktRow"></div>
+        <div class="detail-box" id="pktDetail"></div>
+        <h3 style="font-size:16px;font-weight:900">一次交易，三個封包怎麼走？</h3>
+        <div class="tabs" id="txTabs">
+          <button class="tab" type="button" data-k="in" aria-pressed="true">讀取資料（IN）</button>
+          <button class="tab" type="button" data-k="out" aria-pressed="false">寫入資料（OUT）</button>
+          <button class="tab" type="button" data-k="nak" aria-pressed="false">裝置忙碌（NAK）</button>
+        </div>
+        <div class="tx-list" id="txList"></div>
+        <div class="tx-note" id="txNote"></div>
+        <div class="mistakes-slot" data-key="packet"></div>
+      </div>
+    </section>
+
+    <!-- ===== 7 列舉 ===== -->
+    <section class="slide" data-i="7">
+      <div class="slide-inner">
+        <div class="eyebrow">06 · 列舉</div>
+        <h2><span class="num latin">06</span>列舉（Enumeration）</h2>
+        <p class="lede">裝置插上去的瞬間，Host 其實完全不認識它。<b>列舉</b>就是 Host 一步一步讀取裝置的<b>描述元（Descriptor）</b>，也就是裝置內建的自我介紹表，問出「你是誰、你要做什麼」的過程。完成後，作業系統才會依 <b>VID / PID</b> 與<b>裝置類別</b>載入驅動程式。按「下一步」看看 Host 和 Device 之間說了什麼。</p>
+        <div class="state-row" id="enumStates"></div>
+        <div class="card enum-card">
+          <div class="enum-top"><div class="enum-title" id="enumTitle"></div><div class="enum-count" id="enumCount"></div></div>
+          <div class="enum-flow">
+            <div class="node">Host<small>電腦</small></div>
+            <div class="msgs" id="enumMsgs" aria-live="polite"></div>
+            <div class="node">Device<small>裝置</small></div>
+          </div>
+          <div class="addr-box"><span>裝置目前的位址：</span><b id="enumAddr">—</b></div>
+          <div class="enum-note" id="enumNote"></div>
+          <div class="btn-row">
+            <button class="cta secondary small" id="enumPrev" type="button">上一步</button>
+            <button class="cta small" id="enumNext" type="button">下一步</button>
+            <button class="cta secondary small" id="enumReset" type="button">重來</button>
+          </div>
+        </div>
+        <div class="mistakes-slot" data-key="enum"></div>
+      </div>
+    </section>
+
+    <!-- ===== 8 傳輸類型 ===== -->
+    <section class="slide" data-i="8">
+      <div class="slide-inner">
+        <div class="eyebrow">07 · 傳輸類型</div>
+        <h2><span class="num latin">07</span>四種傳輸類型</h2>
+        <p class="lede">不同裝置對資料的要求不同：滑鼠要<b>即時</b>（低延遲），隨身碟要<b>正確</b>（錯了要重送），視訊要<b>不中斷</b>（要有穩定的頻寬）。所以 USB 定義了四種傳輸類型。點一張卡片，看它適合誰、保證什麼。</p>
+        <div class="tcards" id="typeCards"></div>
+        <div class="card tdetail" id="typeDetail" aria-live="polite"></div>
+        <div>
+          <div class="hint note" style="margin-bottom:6px">示意：一個 1 ms 的幀（全速）裡，Host 先排等時與中斷，再排控制，剩下的空間才給大量傳輸。</div>
+          <div class="frame-bar" id="frameBar"></div>
+        </div>
+        <div class="mistakes-slot" data-key="types"></div>
+      </div>
+    </section>
+
+    <!-- ===== 9 速度 ===== -->
+    <section class="slide" data-i="9">
+      <div class="slide-inner">
+        <div class="eyebrow">08 · 速度與版本</div>
+        <h2><span class="num latin">08</span>USB 的速度差了幾萬倍</h2>
+        <p class="lede">從 1.5 Mbps 到 80 Gbps，速度差了五萬多倍。選一個規格和檔案大小，看看<b>理論上最快</b>要多久。實際會更久，因為有協定開銷，裝置本身也不一定跑得滿。</p>
+        <div class="card speed-panel">
+          <div class="sp-head"><span class="val latin" id="spRate">480</span><span class="unit" id="spName"></span></div>
+          <input type="range" id="spSlider" min="0" max="7" step="1" value="2" aria-label="選擇 USB 速度規格">
+          <div class="size-row"><span style="color:var(--muted)">檔案大小：</span><div class="chip-row" id="sizeRow"></div></div>
+          <div class="stat-row">
+            <div class="stat"><div class="k">對應規格</div><div class="v" id="spVer"></div></div>
+            <div class="stat"><div class="k">理論最短時間</div><div class="v" id="spTime"></div></div>
+            <div class="stat"><div class="k">每秒約可傳送</div><div class="v" id="spMBs"></div></div>
+          </div>
+          <div class="bars" id="spBars"></div>
+          <div class="hint note">長條長度是對數刻度，不然 1.5 Mbps 會短到看不見。</div>
+        </div>
+        <div class="mistakes-slot" data-key="speed"></div>
+      </div>
+    </section>
+
+    <!-- ===== 10 小測驗 ===== -->
+    <section class="slide" data-i="10">
+      <div class="slide-inner">
+        <div class="eyebrow">09 · 小測驗</div>
+        <div class="quiz-head">
+          <h2><span class="num latin">09</span>重點回顧小測驗</h2>
+          <span class="score-pill" id="scorePill">得分 0 / 5</span>
+        </div>
+        <div id="quizList" style="display:flex;flex-direction:column;gap:12px"></div>
+        <button class="cta secondary" id="resetQuiz" type="button">重新測驗</button>
+      </div>
+    </section>
+
+    <!-- ===== 11 總結 ===== -->
+    <section class="slide" data-i="11">
+      <div class="slide-inner">
+        <div class="eyebrow">總結</div>
+        <h2>今天學到了什麼？</h2>
+        <div class="sum-grid" id="sumGrid"></div>
+        <div class="thanks-note"><b>動手做做看：</b>用示波器的兩個通道分別量 D+ 與 D−（或在電腦上用 Wireshark 這套封包分析軟體，搭配 Windows 上的 USB 抓包工具 USBPcap），就能親眼看到 SYNC、PID 和 NRZI 波形。<br><br><b>接著可以研究：</b>USB 轉 UART 晶片（例如 CH340、CP2102 這兩個常見型號）怎麼把今天的 USB 和上一堂的 UART 接在一起，Arduino 板子的序列埠就是這樣來的。</div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+
+  <div class="nav">
+    <button class="nav-btn" id="prevBtn" type="button" aria-label="上一頁">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="dots" id="dots"></div>
+    <button class="nav-btn" id="nextBtn" type="button" aria-label="下一頁">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+
+  /*PURE-START*/
+  function sqPath(levels,u,yHi,yLo,x0){
+    x0 = x0 || 0;
+    var d = '', prev = null;
+    levels.forEach(function(b,i){
+      var y = b ? yHi : yLo, x = x0 + i*u;
+      if (i === 0){ d += 'M'+x+' '+y; }
+      else if (y !== prev){ d += ' L'+x+' '+y; }
+      d += ' L'+(x+u)+' '+y;
+      prev = y;
+    });
+    return d;
+  }
+  var NZ = [-0.62,0.50,-0.95,0.40,0.78,-0.70,-0.82,0.58];
+  function nz(t){
+    var x = t-0.5, n = NZ.length, base;
+    if (x <= 0){ base = NZ[0]; }
+    else if (x >= n-1){ base = NZ[n-1]; }
+    else {
+      var k = Math.floor(x), u = x-k;
+      base = NZ[k] + (NZ[k+1]-NZ[k])*(1-Math.cos(Math.PI*u))/2;
+    }
+    return base + 0.08*Math.sin(2*Math.PI*3*x);
+  }
+  function buildSeq(byte){
+    var seq = [{state:'J',label:'閒置',kind:'idle',bit:null,desc:'線路閒置，維持在 <b>J</b> 狀態（D+ 高、D− 低）。'}];
+    var cur = 'J', ones = 0, syncN = 0;
+    function push(bit,label,kind,descFn){
+      if (bit === 0){ cur = (cur === 'J') ? 'K' : 'J'; }
+      if (bit === 1){ ones++; } else { ones = 0; }
+      seq.push({state:cur,label:label,kind:kind,bit:bit,desc:descFn(cur)});
+    }
+    var sync = [0,0,0,0,0,0,0,1];
+    sync.forEach(function(b){
+      syncN++;
+      var n = syncN;
+      push(b,'SYNC','sync',function(s){
+        return '<b>SYNC</b> 第 '+n+' 個位元＝'+b+'，'+(b===0?'電位翻轉':'電位維持')+'，線路變成 <b>'+s+'</b>。SYNC 讓接收端對齊時脈。';
+      });
+    });
+    for (var i=0;i<8;i++){
+      (function(i){
+        var b = (byte>>i)&1;
+        push(b,'D'+i,'data',function(s){
+          return '<b>資料位元 D'+i+'</b>＝'+b+'，'+(b===0?'電位翻轉':'電位維持')+'，線路是 <b>'+s+'</b>。（LSB 先送）';
+        });
+        if (ones === 6){
+          push(0,'補0','stuff',function(s){
+            var run = (i === 4) ? '連續六個 1（SYNC 最後的 1，加上 D0 ~ D4）' : '連續六個 1';
+            return '<b>位元填充</b>：已經送了'+run+'，強制插入一個 0，線路翻轉成 <b>'+s+'</b>，接收端才不會失去時脈。接收端會把這個補的 0 丟掉。';
+          });
+        }
+      })(i);
+    }
+    seq.push({state:'SE0',label:'EOP',kind:'eop',bit:null,desc:'<b>EOP</b>：D+、D− 同時拉低（SE0），表示封包結束。'});
+    seq.push({state:'SE0',label:'EOP',kind:'eop',bit:null,desc:'<b>EOP</b>：SE0 要維持 2 個位元時間。'});
+    seq.push({state:'J',label:'閒置',kind:'idle',bit:null,desc:'回到 <b>J</b> 閒置狀態，等待下一個封包。'});
+    return seq;
+  }
+  function fmtTime(s){
+    if (s < 1){ var ms = s*1000; return (ms < 10 ? ms.toFixed(1) : String(Math.round(ms)))+' 毫秒'; }
+    if (s < 60){ return (s < 10 ? s.toFixed(1) : String(Math.round(s)))+' 秒'; }
+    if (s < 3600){
+      var m = Math.floor(s/60), r = Math.round(s - m*60);
+      if (r === 60){ m++; r = 0; }
+      return m+' 分 '+r+' 秒';
+    }
+    var h = Math.floor(s/3600), mm = Math.round((s - h*3600)/60);
+    if (mm === 60){ h++; mm = 0; }
+    return h+' 小時 '+mm+' 分';
+  }
+  /*PURE-END*/
+
+  function setHidden(el,flag){ if (flag) el.setAttribute('hidden',''); else el.removeAttribute('hidden'); }
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------- deck nav ---------------- */
+  var TOTAL = 12, cur = 0;
+  var slidesEl = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var dotsWrap = $('dots'), progressFill = $('progressFill'), prevBtn = $('prevBtn'), nextBtn = $('nextBtn');
+  var dotTitles = ['封面','本堂重點','認識 USB','四條線','差動訊號','NRZI 編碼','封包與交易','列舉','傳輸類型','速度與版本','小測驗','總結'];
+  for (var di=0; di<TOTAL; di++){
+    var d = document.createElement('button');
+    d.type = 'button';
+    d.className = 'dot' + (di===0 ? ' on' : '');
+    d.setAttribute('aria-label','跳到第 '+(di+1)+' 頁：'+dotTitles[di]);
+    d.addEventListener('click',(function(idx){ return function(){ goTo(idx); }; })(di));
+    dotsWrap.appendChild(d);
+  }
+  var dots = dotsWrap.querySelectorAll('.dot');
+  function render(prevIdx){
+    slidesEl.forEach(function(s){
+      var idx = parseInt(s.getAttribute('data-i'),10);
+      var on = idx === cur;
+      s.classList.remove('active','leaving-back');
+      if (on){ s.classList.add('active'); }
+      else if (prevIdx !== undefined && idx < cur){ s.classList.add('leaving-back'); }
+      s.inert = !on;
+    });
+    dots.forEach(function(dd,idx){ dd.classList.toggle('on', idx===cur); });
+    progressFill.style.width = (((cur+1)/TOTAL)*100)+'%';
+    prevBtn.disabled = cur===0;
+    nextBtn.disabled = cur===TOTAL-1;
+  }
+  function goTo(i){
+    var prevIdx = cur;
+    cur = Math.max(0, Math.min(TOTAL-1, i));
+    slidesEl[cur].scrollTop = 0;
+    if (typeof hideTip === 'function') hideTip();
+    render(prevIdx);
+  }
+  prevBtn.addEventListener('click',function(){ goTo(cur-1); });
+  nextBtn.addEventListener('click',function(){ goTo(cur+1); });
+  $('startBtn').addEventListener('click',function(){ goTo(1); });
+  document.addEventListener('keydown',function(e){
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    if (e.key === 'ArrowRight') goTo(cur+1);
+    if (e.key === 'ArrowLeft') goTo(cur-1);
+  });
+  var touchX = null, touchY = null;
+  $('slides').addEventListener('touchstart',function(e){ touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; },{passive:true});
+  $('slides').addEventListener('touchend',function(e){
+    if (touchX === null) return;
+    var dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy)*1.6){ goTo(dx > 0 ? cur-1 : cur+1); }
+    touchX = null;
+  },{passive:true});
+
+  /* ---------------- common mistakes ---------------- */
+  var MISTAKES = {
+    what:[
+      ['USB 跟 UART 一樣，兩個裝置可以直接互傳。','拿一條 A 公對 A 公的線把兩台電腦接起來，什麼事都不會發生。兩邊都是 Host，沒有人當 Device，還可能因為兩邊同時供電而損壞。','USB 一定是一個 Host 配一個或多個 Device。要連兩台電腦，需要專用的橋接線或網路卡之類的裝置。'],
+      ['一個 USB 埠只能接一個裝置。','電腦背後一個埠接上 Hub，Hub 再同時接鍵盤、滑鼠、隨身碟，三個裝置共用同一條上行線。','USB 是匯流排，一個 Host 最多管理 127 個裝置位址，靠 Hub 樹狀擴充，頻寬由大家分享。'],
+      ['USB 就是把 UART 換成 USB 接頭。','Arduino UNO R3 接上電腦會出現 COM 埠，很容易以為是 UART。其實板上有 USB 轉 UART 晶片（ATmega16U2 或 CH340），電腦那一側講 USB，晶片另一側才講 UART。','USB 與 UART 是兩套不同的協定。COM 埠只是驅動程式模擬出來的虛擬序列埠。']
+    ],
+    wires:[
+      ['D+ 要接對方的 D−，像 TX、RX 一樣交叉。','自己焊 USB 線時，把綠線接到對面的白線針腳，電腦只顯示「無法辨識的 USB 裝置」。','USB 線是直通線：VBUS 對 VBUS、D+ 對 D+、D− 對 D−、GND 對 GND，不交叉。'],
+      ['USB 埠的 5 V 想拉多少電流都可以。','把吃 1 A 的馬達驅動板直接插在 USB 2.0 埠，超過 500 mA 的標準額度，埠可能過流保護而斷電，電腦甚至當機。','USB 2.0 埠的標準上限是 500 mA（裝置未設定前只有 100 mA），大電流負載要另外供電。'],
+      ['線有插到，就一定有資料。','手邊那條手機充電線只接了紅、黑兩條線，手機會充電，卻在電腦上完全看不到。','要傳資料必須有 D+ 與 D− 兩條線。買線時要確認是「資料線」，不是「僅充電線」。']
+    ],
+    diff:[
+      ['D+ 和 D− 各自傳不同的資料。','以為 D+ 傳滑鼠的資料、D− 傳鍵盤的資料。','D− 永遠是 D+ 的反相，兩條線合起來只表示 1 個位元。不同裝置靠位址區分。'],
+      ['差動訊號完全不怕雜訊。','把 USB 線和大馬達的電源線綁在一起走，常常掉線。','差動只能抵消「兩條線一樣大」的共模雜訊。干擾太強或兩線不對稱時仍會出錯，所以要遠離雜訊源，並使用有遮蔽的線。'],
+      ['USB 線可以無限串長。','接了 10 m 便宜延長線的隨身碟，常常讀到一半就消失。','USB 2.0 單段線長上限約 5 m，更長要靠 Hub 或主動式延長線。']
+    ],
+    nrzi:[
+      ['高電位就是 1，低電位就是 0，跟 UART 一樣。','傳 0x00 時，波形一直密集翻轉；傳 0xFF 時，波形反而幾乎是一條平線，只有補進去的那個 0 翻轉一次。','在 NRZI 裡「翻轉＝0，不變＝1」，要看有沒有變化，不能看電位高低。'],
+      ['補進去的 0 也是資料。','傳 0xFF 時，線上實際多出 1 個位元（SYNC 最後的 1 加上 D0 ~ D4 連成六個 1，所以在 D4 後面插了一個 0）。接收端會把它丟掉，不會變成 9 位元的資料。','位元填充只是為了讓時脈不跑掉。接收端看到連續六個 1 後面的 0，會自動移除。'],
+      ['高位元先送，像寫數字的順序。','傳 0x01 時，第一個送出的是 1。如果用 MSB 先的順序去讀示波器，會把 0x01 誤讀成 0x80。','USB 和 UART 一樣，資料從最低位元 LSB 開始送。']
+    ],
+    packet:[
+      ['裝置可以主動把資料推給 Host。','滑鼠移動時，並不是滑鼠自己喊一聲。是 Host 每隔幾毫秒送一個 IN Token 問「有新座標嗎？」，滑鼠才回資料（常見每 1 ~ 8 ms 輪詢一次）。','一切由 Host 發起，裝置只能回應。沒東西可回時，裝置回 NAK。'],
+      ['NAK 代表傳輸失敗。','隨身碟還在寫入時，Host 向它要資料，它回 NAK，意思是「還沒準備好」，Host 稍後會再問一次。','NAK 是「忙碌，晚點再來」。真的出錯（例如 CRC 不符）時，接收端不回覆，Host 逾時後重送。STALL 才表示端點有問題。'],
+      ['每個封包的資料欄位大小都一樣。','同樣 4096 位元組，全速大量傳輸每包最多 64 位元組，要切成 64 包；高速每包可到 512 位元組，只要 8 包。','資料長度從 0 到 1024 位元組都有可能，上限取決於速度與傳輸類型。']
+    ],
+    enum:[
+      ['插上去就能用，不需要先辨識。','自製的 USB 裝置插上電腦出現「無法辨識的 USB 裝置」，通常是列舉時沒有回應 GET_DESCRIPTOR，或描述元內容有誤。','Host 必須先完成列舉才會載入驅動，裝置韌體要能正確回答描述元請求。'],
+      ['裝置有固定的 USB 位址。','同一支隨身碟，今天插在這個埠位址是 3，換個埠或重新插拔可能變成 7。','位址由 Host 在每次列舉時用 SET_ADDRESS 臨時指派。固定不變的是寫在裝置裡的 VID 與 PID。'],
+      ['一插上電就能用到 500 mA。','一塊耗電 300 mA 的馬達板剛插上時，電腦還在列舉，裝置此時最多只能取用 100 mA，可能因供電不足而一直重新啟動。','要等 SET_CONFIGURATION 完成，才能使用組態中申請的電流（USB 2.0 最多 500 mA）。']
+    ],
+    types:[
+      ['Interrupt 傳輸像 MCU 的中斷，裝置有事會主動打斷 Host。','按下鍵盤一個鍵，並不是鍵盤去中斷電腦，而是 Host 每隔固定時間（常見 8 ms）輪詢一次，才把按鍵取走。','USB 的 Interrupt 是「定期輪詢」，保證的是延遲上限，不是主動通知。'],
+      ['影像、聲音最重要的是正確，所以要用大量傳輸。','網路攝影機如果用 Bulk，匯流排一忙畫面就卡住。等時傳輸固定頻寬、不重送，寧可掉一格畫面，也不拖延。','即時串流用 Isochronous：重視準時，不重視每一包都正確。'],
+      ['隨身碟要快，所以用等時傳輸。','檔案如果用等時傳輸，錯誤的封包會被直接丟掉，檔案少了幾個位元組卻沒人發現。','隨身碟用 Bulk，有 CRC 檢查與重送，保證資料正確。速度則取決於匯流排剩餘的頻寬。']
+    ],
+    speed:[
+      ['接頭是 Type-C 就代表速度快。','手機附的 Type-C 充電線常常只支援 USB 2.0（480 Mbps），接外接 SSD 實測只有約 40 MB/s。','Type-C 只是接頭的外形。速度由線材和雙方裝置支援的規格決定。'],
+      ['版本號越大一定越快。','USB 3.0、USB 3.1 Gen 1、USB 3.2 Gen 1 其實是同一個 5 Gbps。買標示「USB 3.2」的隨身碟以為有 20 Gbps，結果可能只有 5 Gbps。','要看 Gen 1、Gen 2、Gen 2×2 或標示的 Gbps 數字，不要只看版本號。'],
+      ['480 Mbps 就是每秒複製 480 MB。','Mbps 是每秒百萬「位元」，除以 8 才是每秒 60 MB，再扣掉協定開銷與裝置本身的速度，實際大約 35 ~ 40 MB/s。','換算時 bit 要除以 8 變成 byte，並預期實際速度比理論值低。']
+    ]
+  };
+  var CHEV = '<svg class="chev" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var WARN = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 2.5l7 12.5H2L9 2.5z" fill="var(--amber-soft)" stroke="var(--amber-strong)" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 7.5v3.2M9 12.6v.1" stroke="var(--amber-strong)" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  Array.prototype.forEach.call(document.querySelectorAll('.mistakes-slot'),function(slot){
+    var list = MISTAKES[slot.getAttribute('data-key')];
+    if (!list) return;
+    var det = document.createElement('details');
+    det.className = 'mistakes';
+    var html = '<summary>'+WARN+'<span>三個常見錯誤，各附一個例子</span>'+CHEV+'</summary><ul class="m-list">';
+    list.forEach(function(m){
+      html += '<li class="m-item">'+
+        '<p class="m-line"><span class="m-tag bad">迷思</span><span>'+m[0]+'</span></p>'+
+        '<p class="m-line"><span class="m-tag eg">例子</span><span>'+m[1]+'</span></p>'+
+        '<p class="m-line"><span class="m-tag ok">正解</span><span>'+m[2]+'</span></p></li>';
+    });
+    html += '</ul>';
+    det.innerHTML = html;
+    slot.appendChild(det);
+  });
+
+  /* ---------------- slide 0 : strip ---------------- */
+  (function(){
+    var bits = [1,0,1,1,0,0,1,0,1,1];
+    var inv = bits.map(function(b){ return b?0:1; });
+    $('pairStrip').innerHTML =
+      '<path class="p-dp" vector-effect="non-scaling-stroke" d="'+sqPath(bits,52,8,30,0)+'"/>'+
+      '<path class="p-dm" vector-effect="non-scaling-stroke" d="'+sqPath(inv,52,54,76,0)+'"/>';
+  })();
+
+  /* ---------------- key points & summary ---------------- */
+  var CHECK = '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function fillGrid(id,items){
+    $(id).innerHTML = items.map(function(it){ return '<div class="sum-item">'+CHECK+'<div><b>'+it[0]+'</b>'+it[1]+'</div></div>'; }).join('');
+  }
+  fillGrid('keyPoints',[
+    ['Host 主導一切','通訊都由 Host 發起，裝置只能回應。一個 Host 最多管 127 個裝置。'],
+    ['四條線','VBUS、D−、D+、GND。電源與資料同線，插上去就能供電又能通訊。'],
+    ['差動訊號','看 D+ − D−，兩條線一起受到的雜訊在相減時抵消。'],
+    ['NRZI 與位元填充','0 翻轉、1 不變；連續六個 1 後補一個 0；LSB 先送。'],
+    ['封包與交易','SYNC、PID、資料、CRC、EOP。一次交易是 Token、Data、Handshake。'],
+    ['列舉與傳輸類型','先列舉才有驅動；控制、大量、中斷、等時各配不同裝置。']
+  ]);
+  fillGrid('sumGrid',[
+    ['Host / Device','Host 發起、Device 回應；Hub 讓一個 Host 掛上最多 127 個裝置。'],
+    ['VBUS、D−、D+、GND','四條線；USB 3.0 Type-A 再多 5 條高速線，仍相容舊裝置。'],
+    ['差動訊號','D− 是 D+ 的反相，共模雜訊被抵消，所以訊號穩、線可以拉到數公尺。'],
+    ['NRZI 與位元填充','0 翻轉、1 不變，連續六個 1 後補 0，時脈就藏在資料裡。'],
+    ['封包與交易','每筆交易是 Token → Data → Handshake；NAK 是「晚點再來」。'],
+    ['列舉與傳輸類型','Reset、取得描述元、指派位址、設定組態；四種傳輸各有適用裝置。']
+  ]);
+
+  /* ---------------- slide 2 : flip ---------------- */
+  var LET = [
+    {ch:'U',word:'Universal',sub:'通用',desc:'同一種接口通吃鍵盤、滑鼠、儲存、音訊與充電。'},
+    {ch:'S',word:'Serial',sub:'序列',desc:'資料一個位元接著一個位元，在同一對訊號線上依序送出。'},
+    {ch:'B',word:'Bus',sub:'匯流排',desc:'多個裝置共用同一條主幹，由 Host 輪流分配通訊時間。'}
+  ];
+  LET.forEach(function(L){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'flip-card';
+    b.setAttribute('aria-pressed','false');
+    b.innerHTML = '<div class="flip-inner"><div class="flip-face flip-front"><div class="big latin">'+L.ch+'</div><div class="small">'+L.sub+'</div></div>'+
+      '<div class="flip-face flip-back"><div class="word latin">'+L.word+'</div><div class="desc">'+L.desc+'</div></div></div>';
+    b.addEventListener('click',function(){ var on = b.classList.toggle('flipped'); b.setAttribute('aria-pressed',on?'true':'false'); });
+    $('letters').appendChild(b);
+  });
+
+  /* ---------------- slide 3 : wires ---------------- */
+  var WINFO = {
+    vbus:'<b>VBUS（紅，+5 V）</b>：由 Host 供電給裝置。USB 2.0 裝置在完成設定前最多取用 100 mA，設定後最多可申請 500 mA。',
+    dm:'<b>D−（白）</b>：差動資料線的負端。永遠和 D+ 成對使用，兩條線的電壓方向相反。',
+    dp:'<b>D+（綠）</b>：差動資料線的正端。Host 與 Device 輪流使用這一對線收發資料。',
+    gnd:'<b>GND（黑）</b>：共同接地，讓兩邊的電壓有同一個 0 V 參考點。',
+    sstx:'<b>SSTX±</b>：USB 3.x 的高速傳送差動對。Host 的 SSTX 要接到 Device 的 SSRX，所以兩側的標籤是交叉的。',
+    ssrx:'<b>SSRX±</b>：USB 3.x 的高速接收差動對，對應另一端的 SSTX。',
+    drain:'<b>GND_DRAIN</b>：高速差動線的遮蔽接地，幫忙把雜訊導走。'
+  };
+  var infoBox = $('pinInfo');
+  Array.prototype.forEach.call(document.querySelectorAll('#boardSvg .pin'),function(p){
+    function pick(){
+      document.querySelectorAll('#boardSvg .pin').forEach(function(x){ x.classList.remove('active'); });
+      p.classList.add('active');
+      infoBox.innerHTML = WINFO[p.getAttribute('data-pin')];
+    }
+    p.addEventListener('click',pick);
+    p.addEventListener('keydown',function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); } });
+  });
+  var live = false, usb3 = false;
+  $('plugBtn').addEventListener('click',function(){
+    live = !live;
+    $('boardSvg').classList.toggle('live',live);
+    $('plugBtn').textContent = live ? '拔掉裝置' : '插入裝置：看看供電';
+    infoBox.innerHTML = live
+      ? '<b>裝置插入</b>：Host 先從 VBUS 送出 5 V 讓裝置上電（紅線在流動）。此時裝置最多只能取用 100 mA，接下來才進入列舉，也就是後面「列舉」那一頁。'
+      : '裝置已拔掉，VBUS 不再供電。';
+  });
+  $('modeBtn').addEventListener('click',function(){
+    usb3 = !usb3;
+    setHidden($('ss3'),!usb3);
+    var h = usb3 ? 244 : 150;
+    $('hostRect').setAttribute('height',h);
+    $('devRect').setAttribute('height',h);
+    $('boardSvg').setAttribute('viewBox','0 0 520 '+(usb3?262:176));
+    $('modeBtn').textContent = usb3 ? '切換回 USB 2.0（4 條線）' : '看看 USB 3.0 Type-A（多 5 條線）';
+    infoBox.innerHTML = usb3
+      ? 'USB 3.0 Type-A 在原本 4 條線之外多了 5 條：<b>SSTX±</b> 與 <b>SSRX±</b> 兩對高速差動線，加上 <b>GND_DRAIN</b>。D+ 與 D− 還在，所以舊裝置仍可用 USB 2.0 的方式連線。點藍色標籤看說明。'
+      : '回到 USB 2.0：只有 VBUS、D−、D+、GND 四條線。';
+  });
+
+  /* ---------------- slide 4 : differential ---------------- */
+  var dBits = [1,0,1,1,0,0,1,0], VH = 3.3;
+  function bitsHtml(arr,badFn){
+    return arr.map(function(b,i){ return '<span class="bit'+(badFn&&badFn(i)?' bad':'')+'">'+b+'</span>'; }).join('');
+  }
+  function drawDiff(){
+    var A = parseInt($('noiseSlider').value,10)/10;
+    $('noiseVal').textContent = A.toFixed(1)+' V';
+    var n = dBits.length, x0 = 52, pw = 572, u = pw/n;
+    var aTop = 44, aH = 128, vmin = -3.6, vmax = 6.9, bTop = 220, bH = 76, bm = 3.8;
+    function xs(t){ return x0 + t*u; }
+    function ya(v){ return aTop + (vmax-v)/(vmax-vmin)*aH; }
+    function yb(v){ return bTop + (bm-v)/(2*bm)*bH; }
+    var p = [];
+    p.push('<text class="ttl" x="'+x0+'" y="16">① D+ 與 D− 都被雜訊干擾，只看 D+ 來判斷</text>');
+    p.push('<text class="ttl" x="'+x0+'" y="198">② 看 D+ − D−：兩條線的雜訊相減後消失</text>');
+    for (var i=0;i<=n;i++){
+      p.push('<path class="bnd" d="M'+xs(i)+' '+aTop+'V'+(aTop+aH)+'"/>');
+      p.push('<path class="bnd" d="M'+xs(i)+' '+bTop+'V'+(bTop+bH)+'"/>');
+    }
+    dBits.forEach(function(b,i){ p.push('<text class="bitlab" x="'+xs(i+0.5)+'" y="36">'+b+'</text>'); });
+    [[0,'0V'],[VH,'3.3V']].forEach(function(l){
+      p.push('<path class="grid-l" d="M'+x0+' '+ya(l[0])+'H'+(x0+pw)+'"/>');
+      p.push('<text class="ax" x="'+(x0-6)+'" y="'+(ya(l[0])+4)+'" text-anchor="end">'+l[1]+'</text>');
+    });
+    p.push('<path class="thr" d="M'+x0+' '+ya(VH/2)+'H'+(x0+pw)+'"/>');
+    p.push('<path class="grid-l" d="M'+x0+' '+yb(0)+'H'+(x0+pw)+'"/>');
+    p.push('<text class="ax" x="'+(x0-6)+'" y="'+(yb(0)+4)+'" text-anchor="end">0V</text>');
+    p.push('<text class="ax" x="'+(x0-6)+'" y="'+(yb(VH)+4)+'" text-anchor="end">+3.3</text>');
+    p.push('<text class="ax" x="'+(x0-6)+'" y="'+(yb(-VH)+4)+'" text-anchor="end">−3.3</text>');
+    function tr(levFn){
+      var d = '';
+      for (var i=0;i<n;i++){
+        var lv = levFn(i);
+        for (var k=0;k<=10;k++){
+          var t = i + (k===10 ? 0.999 : k/10);
+          d += (d ? ' L' : 'M') + xs(t).toFixed(1) + ' ' + ya(lv + A*nz(t)).toFixed(1);
+        }
+      }
+      return d;
+    }
+    p.push('<path class="dtrace" stroke="var(--amber-strong)" d="'+tr(function(i){ return dBits[i]?0:VH; })+'"/>');
+    p.push('<path class="dtrace" stroke="var(--accent)" d="'+tr(function(i){ return dBits[i]?VH:0; })+'"/>');
+    p.push('<path class="dtrace" stroke="var(--accent)" d="'+sqPath(dBits,u,yb(VH),yb(-VH),x0)+'"/>');
+    var single = [], diff = [];
+    dBits.forEach(function(b,i){
+      var lv = b?VH:0, v = lv + A*nz(i+0.5);
+      var s = v > VH/2 ? 1 : 0;
+      single.push(s);
+      diff.push(((b?VH:0)-(b?0:VH)) > 0 ? 1 : 0);
+      p.push('<circle cx="'+xs(i+0.5)+'" cy="'+ya(v)+'" r="5" fill="'+(s===b?'var(--accent)':'var(--coral)')+'" stroke="var(--surface)" stroke-width="2"/>');
+      p.push('<circle cx="'+xs(i+0.5)+'" cy="'+yb(b?VH:-VH)+'" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>');
+    });
+    $('diffSvg').innerHTML = p.join('');
+    var errs = single.filter(function(s,i){ return s !== dBits[i]; }).length;
+    $('dBitsOrig').innerHTML = bitsHtml(dBits);
+    $('dBitsSingle').innerHTML = bitsHtml(single,function(i){ return single[i] !== dBits[i]; });
+    $('dBitsDiff').innerHTML = bitsHtml(diff,function(i){ return diff[i] !== dBits[i]; });
+    var msg;
+    if (A === 0){ msg = '沒有雜訊時，兩種方式都能正確判讀。把滑桿往右拉，看看單端的判讀會怎麼變。'; }
+    else if (errs > 0){ msg = '雜訊 <b>'+A.toFixed(1)+' V</b>：只看 D+ 會誤判 <b>'+errs+'</b> 個位元（紅色）。看 D+ − D− 仍然全部正確，因為同樣大小的雜訊在相減時被抵消了。'; }
+    else { msg = '雜訊 <b>'+A.toFixed(1)+' V</b> 還沒大到讓單端判讀出錯，再往右拉試試。差動判讀從頭到尾都是正確的。'; }
+    $('diffResult').innerHTML = msg;
+  }
+  $('noiseSlider').addEventListener('input',drawDiff);
+  drawDiff();
+
+  /* ---------------- slide 5 : NRZI ---------------- */
+  var BYTES = [[0x00,'全 0'],[0x55,'0 與 1 交錯'],[0xA5,'一般資料'],[0xFF,'D0 ~ D7 全是 1，會補 0'],[0x7F,'D0 ~ D6 是 1，會補 0']];
+  var nrziByte = 0x55, nrziTimer = null, seq = [];
+  function hex2(v){ var s = v.toString(16).toUpperCase(); return '0x'+(s.length<2?'0'+s:s); }
+  BYTES.forEach(function(B){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip'+(B[0]===nrziByte?' sel':'');
+    b.setAttribute('data-v',B[0]);
+    b.innerHTML = hex2(B[0])+'<small>'+B[1]+'</small>';
+    b.addEventListener('click',function(){
+      nrziByte = B[0];
+      Array.prototype.forEach.call($('byteRow').children,function(x){ x.classList.remove('sel'); });
+      b.classList.add('sel');
+      stopNrzi();
+      nrziDraw();
+      $('nrziNow').innerHTML = '已載入 <b>'+hex2(nrziByte)+'</b> 的波形，按下「送出」逐格播放。';
+    });
+    $('byteRow').appendChild(b);
+  });
+  function stopNrzi(){ if (nrziTimer){ clearInterval(nrziTimer); nrziTimer = null; } }
+  function nrziHighlight(i){
+    var ids = ['nrziState','nrziBit','nrziLabel'];
+    ids.forEach(function(id){
+      Array.prototype.forEach.call($(id).children,function(c,idx){ c.classList.toggle('on', idx === i); });
+    });
+    var hl = $('nrziHl');
+    if (i === null || i === undefined){ hl.style.display = 'none'; return; }
+    hl.style.display = 'block';
+    hl.style.left = (i/seq.length*100)+'%';
+    hl.style.width = (100/seq.length)+'%';
+    var c = $('nrziLabel').children[i];
+    if (c && c.scrollIntoView){ c.scrollIntoView({behavior:reduceMotion?'auto':'smooth',inline:'center',block:'nearest'}); }
+  }
+  function nrziDraw(){
+    seq = buildSeq(nrziByte);
+    var n = seq.length, u = 40, W = n*u;
+    var dp = seq.map(function(s){ return s.state === 'J' ? 1 : 0; });
+    var dm = seq.map(function(s){ return s.state === 'K' ? 1 : 0; });
+    var g = '';
+    for (var i=1;i<n;i++){ g += '<line class="bnd" x1="'+(i*u)+'" y1="4" x2="'+(i*u)+'" y2="146"/>'; }
+    var svg = $('nrziSvg');
+    svg.setAttribute('viewBox','0 0 '+W+' 150');
+    svg.innerHTML = g +
+      '<path class="dtrace" stroke="var(--accent)" d="'+sqPath(dp,u,22,62,0)+'"/>'+
+      '<path class="dtrace" stroke="var(--amber-strong)" d="'+sqPath(dm,u,92,132,0)+'"/>';
+    var box = $('nrziBox');
+    box.style.minWidth = (n*30+72)+'px';
+    ['nrziState','nrziBit','nrziLabel'].forEach(function(id){ $(id).style.setProperty('--n',n); });
+    $('nrziState').innerHTML = seq.map(function(s){ return '<span>'+s.state+'</span>'; }).join('');
+    $('nrziBit').innerHTML = seq.map(function(s){ return '<span class="'+(s.kind==='stuff'?'stuff':'')+'">'+(s.bit===null?'·':s.bit)+'</span>'; }).join('');
+    $('nrziLabel').innerHTML = seq.map(function(s){ return '<span class="'+(s.kind==='stuff'?'stuff':'')+'">'+s.label+'</span>'; }).join('');
+    nrziHighlight(null);
+    var msb = ''; for (var k=7;k>=0;k--){ msb += (nrziByte>>k)&1; }
+    var lsb = ''; for (var k2=0;k2<8;k2++){ lsb += ((nrziByte>>k2)&1)+(k2<7?' ':''); }
+    var si = -1;
+    seq.forEach(function(s,idx){ if (s.kind === 'stuff') si = idx; });
+    var stuffTxt = si < 0 ? '沒有' : '有，在 '+seq[si-1].label+' 後插入 1 個 0'+(seq[si-1].label === 'D4' ? '（SYNC 最後的 1 ＋ D0 ~ D4，剛好六個 1）' : '');
+    $('nrziInfo').innerHTML =
+      '<div>位元組：<b>'+hex2(nrziByte)+'</b></div>'+
+      '<div>二進位（MSB→LSB）：<b>'+msb+'</b></div>'+
+      '<div>實際送出（LSB 先）：<b>'+lsb+'</b></div>'+
+      '<div>位元填充：<b>'+stuffTxt+'</b></div>';
+  }
+  $('nrziPlay').addEventListener('click',function(){
+    stopNrzi();
+    nrziDraw();
+    var i = 0;
+    function show(){
+      nrziHighlight(i);
+      $('nrziNow').innerHTML = '目前（'+(i+1)+' / '+seq.length+'）：'+seq[i].desc;
+    }
+    show();
+    nrziTimer = setInterval(function(){
+      i++;
+      if (i >= seq.length){
+        stopNrzi();
+        nrziHighlight(null);
+        $('nrziNow').innerHTML = '已送出 <b>'+hex2(nrziByte)+'</b>。回頭看第二列：位元值是 0 的地方，線路狀態一定會換。';
+        return;
+      }
+      show();
+    },520);
+  });
+  nrziDraw();
+
+  /* ---------------- slide 6 : packets ---------------- */
+  var SEGDESC = {
+    SYNC:'同步欄位，固定 8 個位元（KJKJKJKK）。讓接收端對齊時脈節奏，像 UART 的起始位元，但更長、更規律。',
+    ADDR:'裝置位址，7 位元（0 ~ 127）。列舉前所有裝置的位址都是 0，Host 用 SET_ADDRESS 指派新位址。',
+    ENDP:'端點編號，4 位元（0 ~ 15）。端點像裝置上的「窗口」，端點 0 專門負責控制與列舉。',
+    CRC5:'5 位元的循環冗餘檢查，只保護 Token 裡的 ADDR 與 ENDP 欄位。',
+    DATA:'真正要搬運的內容，0 ~ 1024 位元組，上限依速度與傳輸類型而定（例如全速大量傳輸最多 64 位元組、高速大量傳輸 512 位元組）。',
+    CRC16:'16 位元的 CRC，檢查資料欄位有沒有在傳輸中出錯。錯了就不回 ACK，Host 會重送。',
+    EOP:'封包結尾：D+、D− 同時拉低（SE0）約 2 個位元時間，再回到 J 閒置狀態。'
+  };
+  var PKTS = {
+    token:{name:'Token 封包',desc:'Host 用它說明「接下來要對哪個裝置的哪個端點做什麼」。常見種類：IN（讀）、OUT（寫）、SETUP（控制請求）。',
+      pid:'封包識別碼，共 8 位元：前 4 位元是種類，後 4 位元是它的反相，用來自我檢查。Token 常見種類：OUT＝0001、IN＝1001、SETUP＝1101。',
+      segs:[['SYNC','8 位元','k-sync',8],['PID','8 位元','k-pid',8],['ADDR','7 位元','k-field',7],['ENDP','4 位元','k-field',4],['CRC5','5 位元','k-crc',5],['EOP','SE0 × 2','k-eop',4]]},
+    data:{name:'Data 封包',desc:'搬運真正的資料。DATA0 與 DATA1 輪流使用，讓雙方確認有沒有漏掉或重複的封包。',
+      pid:'封包識別碼，共 8 位元：前 4 位元是種類，後 4 位元是它的反相。Data 封包的 PID：DATA0＝0011、DATA1＝1011，兩者輪流出現。',
+      segs:[['SYNC','8 位元','k-sync',8],['PID','8 位元','k-pid',8],['DATA','0 ~ 1024 B','k-field',20],['CRC16','16 位元','k-crc',16],['EOP','SE0 × 2','k-eop',4]]},
+    hand:{name:'Handshake 封包',desc:'最短的封包，只有 PID，用來回報這次交易的結果。',
+      pid:'封包識別碼，共 8 位元：前 4 位元是種類，後 4 位元是它的反相。ACK＝0010（收到了）、NAK＝1010（還沒準備好，晚點再來）、STALL＝1110（端點出問題或不支援這個請求）。',
+      segs:[['SYNC','8 位元','k-sync',8],['PID','8 位元','k-pid',8],['EOP','SE0 × 2','k-eop',4]]}
+  };
+  var curPkt = 'token';
+  function renderPkt(){
+    var P = PKTS[curPkt], row = $('pktRow');
+    row.innerHTML = '';
+    P.segs.forEach(function(s){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pseg '+s[2];
+      b.style.flexGrow = s[3];
+      b.innerHTML = '<span class="pn">'+s[0]+'</span><span class="ps">'+s[1]+'</span>';
+      b.addEventListener('click',function(){
+        Array.prototype.forEach.call(row.children,function(x){ x.classList.remove('sel'); });
+        b.classList.add('sel');
+        var txt = s[0] === 'PID' ? P.pid : SEGDESC[s[0]];
+        $('pktDetail').innerHTML = '<span class="tag '+s[2]+'" style="--c:var(--'+(s[2]==='k-sync'||s[2]==='k-eop'?'coral':s[2]==='k-pid'?'accent':s[2]==='k-crc'?'amber-strong':'blue')+')">'+s[0]+'</span><br>'+txt;
+      });
+      row.appendChild(b);
+    });
+    $('pktDetail').innerHTML = '<b>'+P.name+'</b>：'+P.desc+'<br><span style="color:var(--muted)">點一下上面的方塊，看每個欄位的意義。</span>';
+  }
+  Array.prototype.forEach.call($('pktTabs').children,function(t){
+    t.addEventListener('click',function(){
+      curPkt = t.getAttribute('data-k');
+      Array.prototype.forEach.call($('pktTabs').children,function(x){ x.setAttribute('aria-pressed',x===t?'true':'false'); });
+      renderPkt();
+    });
+  });
+  renderPkt();
+
+  var TX = {
+    in:{steps:[
+      ['host','Token IN','「我要從 5 號裝置的端點 1 讀資料。」'],
+      ['dev','DATA0 + 資料','裝置把資料送出去。'],
+      ['host','ACK','「收到了，CRC 也正確。」']],note:'Host 發起，裝置回資料，Host 確認。'},
+    out:{steps:[
+      ['host','Token OUT','「我要寫資料到 5 號裝置的端點 2。」'],
+      ['host','DATA0 + 資料','Host 把資料送出去。'],
+      ['dev','ACK','「收到了。」']],note:'這次資料由 Host 送出，確認改由裝置回。'},
+    nak:{steps:[
+      ['host','Token IN','「我要從 5 號裝置的端點 1 讀資料。」'],
+      ['dev','NAK','「資料還沒準備好，晚點再問。」']],note:'只有 2 個封包。NAK 不是錯誤，Host 稍後會再問一次。'}
+  };
+  function renderTx(k){
+    var T = TX[k];
+    $('txList').innerHTML = T.steps.map(function(s,i){
+      var isHost = s[0] === 'host';
+      return '<div class="tx-step" style="--d:'+(reduceMotion?0:i*0.18)+'s"><span class="tx-dir '+s[0]+'">'+(isHost?'Host → Device':'Device → Host')+'</span><div class="tx-body"><b>'+s[1]+'</b>　'+s[2]+'</div></div>';
+    }).join('');
+    $('txNote').textContent = T.note;
+  }
+  Array.prototype.forEach.call($('txTabs').children,function(t){
+    t.addEventListener('click',function(){
+      Array.prototype.forEach.call($('txTabs').children,function(x){ x.setAttribute('aria-pressed',x===t?'true':'false'); });
+      renderTx(t.getAttribute('data-k'));
+    });
+  });
+  renderTx('in');
+
+  /* ---------------- slide 7 : enumeration ---------------- */
+  var STATES = ['Attached','Powered','Default','Address','Configured'];
+  var ENUM = [
+    {t:'偵測插入',st:1,addr:'—',msgs:[['l','裝置在 D+（全速、高速）或 D−（低速）上，用 1.5 kΩ 電阻拉到 3.3 V']],
+     note:'Host 端的 D+、D− 各有 15 kΩ 下拉電阻，平時兩線都是低電位。哪一條線被拉高，Host 就知道有裝置插入，也順便知道它是全速還是低速。'},
+    {t:'匯流排重置',st:2,addr:'0',msgs:[['r','Reset：D+、D− 同時拉低至少 10 ms（SE0）']],
+     note:'裝置收到重置後回到預設狀態，只回應位址 0。高速裝置會在這段時間用 chirp 訊號和 Host 協商，升級到 480 Mbps。'},
+    {t:'讀取描述元的前 8 位元組',st:2,addr:'0',msgs:[['r','SETUP：GET_DESCRIPTOR（裝置描述元，只要 8 位元組），送到位址 0、端點 0'],['l','DATA：回傳描述元的前 8 位元組']],
+     note:'前 8 位元組裡有端點 0 的最大封包大小。Host 要先知道這個數字，才能用正確的大小和裝置溝通。'},
+    {t:'指派位址',st:3,addr:'5',msgs:[['r','SETUP：SET_ADDRESS(5)'],['l','完成回報（零長度封包）']],
+     note:'位址 5 只是舉例，由 Host 從 1 ~ 127 挑一個沒人用的。之後這個裝置只回應位址 5，位址 0 就空出來給下一個新插入的裝置。'},
+    {t:'讀取完整描述元',st:3,addr:'5',msgs:[['r','GET_DESCRIPTOR：裝置、組態、字串描述元'],['l','回傳 VID、PID、裝置類別、介面與端點、耗電量']],
+     note:'作業系統靠 VID、PID 與裝置類別（例如 HID 滑鼠、Mass Storage 隨身碟）決定要載入哪個驅動程式。'},
+    {t:'設定組態',st:4,addr:'5',msgs:[['r','SETUP：SET_CONFIGURATION(1)'],['l','完成回報，裝置進入 Configured 狀態']],
+     note:'裝置此時才可以使用組態中申請的電流（USB 2.0 最多 500 mA）。驅動程式載入後，滑鼠游標開始移動，隨身碟也出現磁碟機代號。'}
+  ];
+  var estep = 0;
+  function renderEnum(){
+    var E = ENUM[estep];
+    $('enumTitle').textContent = E.t;
+    $('enumCount').textContent = '第 '+(estep+1)+' / '+ENUM.length+' 步';
+    $('enumAddr').textContent = E.addr;
+    $('enumNote').textContent = E.note;
+    $('enumMsgs').innerHTML = E.msgs.map(function(m){
+      return '<div class="msg '+m[0]+'">'+(m[0]==='r'?'Host → Device　':'Device → Host　')+m[1]+'</div>';
+    }).join('');
+    $('enumStates').innerHTML = STATES.map(function(s,i){
+      return '<span class="state-pill '+(i<E.st?'done':i===E.st?'now':'')+'">'+s+'</span>';
+    }).join('');
+    $('enumPrev').disabled = estep === 0;
+    $('enumNext').disabled = estep === ENUM.length-1;
+  }
+  $('enumPrev').addEventListener('click',function(){ if (estep>0){ estep--; renderEnum(); } });
+  $('enumNext').addEventListener('click',function(){ if (estep<ENUM.length-1){ estep++; renderEnum(); } });
+  $('enumReset').addEventListener('click',function(){ estep = 0; renderEnum(); });
+  renderEnum();
+
+  /* ---------------- slide 8 : transfer types ---------------- */
+  var TYPES = [
+    {n:'控制',en:'Control',one:'用來「下命令、問資料」。',dev:'所有裝置的端點 0，列舉與設定都靠它',retry:'有，錯了會重送',bw:'Host 保留少量頻寬，不會被餓死',lat:'沒有嚴格保證',slot:'控制'},
+    {n:'大量',en:'Bulk',one:'要正確、不趕時間的大量資料。',dev:'隨身碟、外接硬碟、印表機、掃描器',retry:'有，CRC 檢查加重送',bw:'沒有保證，只用其他類型用剩的頻寬',lat:'沒有保證',slot:'大量'},
+    {n:'中斷',en:'Interrupt',one:'小量、需要及時處理的資料。',dev:'鍵盤、滑鼠、遊戲手把',retry:'有，錯了會重送',bw:'保留固定頻寬',lat:'有上限：Host 依約定的間隔定期輪詢',slot:'中斷'},
+    {n:'等時',en:'Isochronous',one:'即時串流，準時比正確更重要。',dev:'網路攝影機、USB 麥克風、耳機',retry:'沒有，錯了就丟掉',bw:'保證固定頻寬',lat:'有保證，每個間隔都會安排',slot:'等時'}
+  ];
+  var FRAME = [['等時',22],['中斷',18],['控制',12],['大量（吃剩下的）',48]];
+  var curType = 3;
+  function renderType(){
+    var T = TYPES[curType];
+    Array.prototype.forEach.call($('typeCards').children,function(c,i){ c.setAttribute('aria-pressed',i===curType?'true':'false'); });
+    $('typeDetail').innerHTML =
+      '<div class="one">'+T.n+'傳輸（'+T.en+'）：'+T.one+'</div>'+
+      '<dl class="tdl"><dt>代表裝置</dt><dd>'+T.dev+'</dd><dt>錯誤重送</dt><dd>'+T.retry+'</dd><dt>頻寬</dt><dd>'+T.bw+'</dd><dt>延遲</dt><dd>'+T.lat+'</dd></dl>';
+    Array.prototype.forEach.call($('frameBar').children,function(c,i){ c.classList.toggle('on',FRAME[i][0].indexOf(T.slot) === 0); });
+  }
+  TYPES.forEach(function(T,i){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tcard';
+    b.setAttribute('aria-pressed','false');
+    b.innerHTML = '<span class="tn">'+T.n+'</span><span class="te">'+T.en+'</span>';
+    b.addEventListener('click',function(){ curType = i; renderType(); });
+    $('typeCards').appendChild(b);
+  });
+  FRAME.forEach(function(f){
+    var d = document.createElement('div');
+    d.style.flex = f[1]+' 1 0';
+    d.textContent = f[0];
+    $('frameBar').appendChild(d);
+  });
+  renderType();
+
+  /* ---------------- slide 9 : speed ---------------- */
+  var SP = [
+    {n:'Low Speed',v:'USB 1.x 低速',r:1.5e6,l:'1.5 Mbps'},
+    {n:'Full Speed',v:'USB 1.x 全速',r:12e6,l:'12 Mbps'},
+    {n:'High Speed',v:'USB 2.0',r:480e6,l:'480 Mbps'},
+    {n:'SuperSpeed',v:'USB 3.2 Gen 1（舊稱 USB 3.0）',r:5e9,l:'5 Gbps'},
+    {n:'SuperSpeed+',v:'USB 3.2 Gen 2',r:10e9,l:'10 Gbps'},
+    {n:'SuperSpeed+ 2×2',v:'USB 3.2 Gen 2×2',r:20e9,l:'20 Gbps'},
+    {n:'USB4',v:'USB4 40Gbps',r:40e9,l:'40 Gbps'},
+    {n:'USB4 v2.0',v:'USB4 80Gbps',r:80e9,l:'80 Gbps'}
+  ];
+  var SIZES = [['100 MB',8e8],['1 GB',8e9],['10 GB',8e10]];
+  var spIdx = 2, sizeIdx = 1;
+  function logw(r){ return 4 + 96*Math.log(r/1.5e6)/Math.log(80e9/1.5e6); }
+  SP.forEach(function(S,i){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bar-btn';
+    b.innerHTML = '<span>'+S.n+'</span><span class="track"><span class="fill" style="width:'+logw(S.r).toFixed(1)+'%"></span></span><span class="rt">'+S.l+'</span>';
+    b.addEventListener('click',function(){ spIdx = i; $('spSlider').value = i; renderSpeed(); });
+    $('spBars').appendChild(b);
+  });
+  SIZES.forEach(function(Z,i){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip'+(i===sizeIdx?' sel':'');
+    b.textContent = Z[0];
+    b.addEventListener('click',function(){
+      sizeIdx = i;
+      Array.prototype.forEach.call($('sizeRow').children,function(x,j){ x.classList.toggle('sel',j===i); });
+      renderSpeed();
+    });
+    $('sizeRow').appendChild(b);
+  });
+  function fmtMB(v){ return v >= 100 ? Math.round(v).toLocaleString('en-US') : (v >= 10 ? v.toFixed(1) : v.toFixed(2)); }
+  function renderSpeed(){
+    var S = SP[spIdx];
+    $('spRate').textContent = S.l.split(' ')[0];
+    $('spName').textContent = S.l.split(' ')[1]+'　'+S.n;
+    $('spVer').textContent = S.v;
+    $('spTime').textContent = fmtTime(SIZES[sizeIdx][1]/S.r);
+    $('spMBs').textContent = fmtMB(S.r/8/1e6)+' MB';
+    Array.prototype.forEach.call($('spBars').children,function(c,i){ c.classList.toggle('sel',i===spIdx); });
+  }
+  $('spSlider').addEventListener('input',function(){ spIdx = parseInt(this.value,10); renderSpeed(); });
+  renderSpeed();
+
+  /* ---------------- slide 10 : quiz ---------------- */
+  var QUIZ = [
+    {q:'USB 通訊是由誰主動發起的？',opts:['裝置（Device），有資料就送','主機（Host），裝置只能回應','誰先有資料誰就先送'],c:1,
+     e:'USB 是主從式架構，所有交易都由 Host 發起。滑鼠能回報座標，是因為 Host 定期輪詢它。'},
+    {q:'USB 2.0 為什麼要用 D+、D− 差動訊號？',opts:['外界雜訊同時干擾兩條線，相減後被抵消','可以同時傳兩個不同的位元組','讓線材比較便宜'],c:0,
+     e:'接收端看的是 D+ 與 D− 的電壓差，兩條線一起受到的雜訊在相減時消失。'},
+    {q:'NRZI 編碼中，要傳送位元 0 時，線路會怎麼變化？',opts:['維持原本的電位','固定拉到低電位','電位翻轉（J ↔ K）'],c:2,
+     e:'翻轉代表 0，維持不變代表 1。連續六個 1 後要補一個 0，避免太久不變而失去時脈。'},
+    {q:'隨身碟最適合哪一種傳輸類型？',opts:['等時傳輸（Isochronous）','大量傳輸（Bulk）','中斷傳輸（Interrupt）'],c:1,
+     e:'隨身碟要資料正確，不趕時間，Bulk 有 CRC 檢查與重送，只是速度取決於剩餘的頻寬。'},
+    {q:'新裝置插上後，Host 逐步詢問「你是誰」並指派位址的過程叫什麼？',opts:['鮑率協商','位元填充','列舉（Enumeration）'],c:2,
+     e:'列舉包含重置、取得描述元、SET_ADDRESS、SET_CONFIGURATION，完成後才會載入驅動程式。'}
+  ];
+  var score = 0;
+  function buildQuiz(){
+    var list = $('quizList');
+    list.innerHTML = '';
+    score = 0;
+    $('scorePill').textContent = '得分 0 / '+QUIZ.length;
+    QUIZ.forEach(function(item,qi){
+      var card = document.createElement('div');
+      card.className = 'q-card';
+      card.innerHTML = '<div class="q-title">Q'+(qi+1)+'. '+item.q+'</div><div class="opts">'+
+        item.opts.map(function(o,oi){ return '<button type="button" class="opt" data-oi="'+oi+'">'+o+'</button>'; }).join('')+
+        '</div><div class="q-explain">'+item.e+'</div>';
+      var ex = card.querySelector('.q-explain');
+      Array.prototype.forEach.call(card.querySelectorAll('.opt'),function(btn){
+        btn.addEventListener('click',function(){
+          if (card.dataset.locked) return;
+          card.dataset.locked = '1';
+          var oi = parseInt(btn.getAttribute('data-oi'),10);
+          Array.prototype.forEach.call(card.querySelectorAll('.opt'),function(o,i){
+            o.disabled = true;
+            if (i === item.c) o.classList.add('correct');
+            else if (i === oi) o.classList.add('wrong');
+          });
+          if (oi === item.c) score++;
+          ex.classList.add('show');
+          $('scorePill').textContent = '得分 '+score+' / '+QUIZ.length;
+        });
+      });
+      list.appendChild(card);
+    });
+  }
+  buildQuiz();
+  $('resetQuiz').addEventListener('click',buildQuiz);
+
+  /* ---------------- glossary ---------------- */
+  var GLOSS = {
+    host:{c:'Host',n:'Host（主機）',d:'發起所有通訊的一方，通常是電腦、手機或單板電腦。USB 規定只有 Host 能主動開口。',m:'主機（Host）'},
+    device:{c:'Device',n:'Device（裝置）',d:'被 Host 管理的一方，例如滑鼠、鍵盤、隨身碟。只能回應 Host 的詢問，不能主動說話。',m:'裝置（Device）'},
+    hub:{c:'Hub',n:'Hub（集線器）',d:'把一個 USB 埠變成多個的裝置，可以一層接一層。一個 Host 最多管理 127 個裝置位址。',m:'集線器（Hub）'},
+    clock:{c:'時脈',n:'時脈（Clock）',d:'通訊雙方用來決定「何時讀取一個位元」的節拍。UART 靠雙方事先約好的鮑率各自計時；USB 沒有獨立的時脈線，節拍藏在資料裡（靠 NRZI 與 SYNC）。',m:'時脈'},
+    single:{c:'單端',n:'單端（Single-ended）',d:'用「一條線對地的電壓」表示位元，UART 的 TX 就是這樣。容易被雜訊影響。',m:'單端'},
+    diff:{c:'差動',n:'差動（Differential）',d:'用「兩條線之間的電壓差」表示位元。USB 2.0 的 D+ 與 D− 就是一對差動線，後面「差動訊號」那一頁會實際比較。',m:'差動'},
+    hotplug:{c:'熱插拔',n:'熱插拔（Hot plug）',d:'電腦開著、裝置正在運作時直接插上或拔掉，不需要重新開機。',m:'熱插拔'},
+    enum:{c:'列舉',n:'列舉（Enumeration）',d:'裝置插上後，Host 逐步問出裝置身分、指派位址、載入驅動程式的流程。後面「列舉」那一頁會一步步看。',m:'列舉'},
+    vbus:{c:'VBUS',n:'VBUS',d:'USB 線上的 +5 V 電源線，由 Host 供電給裝置。',m:'VBUS'},
+    speed:{c:'Mbps／速度等級',n:'Mbps 與低速、全速、高速',d:'Mbps＝每秒百萬位元。USB 1.x 的低速（Low Speed）是 1.5 Mbps，全速（Full Speed）是 12 Mbps；USB 2.0 的高速（High Speed）是 480 Mbps。',m:'Mbps'},
+    driver:{c:'驅動程式',n:'驅動程式（Driver）',d:'作業系統裡讓電腦認得並操作某種裝置的程式。沒有對應的驅動，裝置就無法使用。'},
+    com:{c:'COM 埠',n:'COM 埠（虛擬序列埠）',d:'Windows 裡看到的 COM3 之類的序列埠。USB 轉 UART 晶片的驅動程式模擬出來，讓軟體可以把它當 UART 來用。'},
+    usb2uart:{c:'USB 轉 UART 晶片',n:'USB 轉 UART 晶片',d:'例如 CH340、CP2102、ATmega16U2。一邊接電腦講 USB，一邊接微控制器講 UART。'},
+
+    configd:{c:'完成設定',n:'完成設定（Configured）',d:'列舉完成、Host 用 SET_CONFIGURATION 選好組態之後的狀態。裝置要到這時才能使用較大的電流。後面「列舉」那一頁會說明。',m:'完成設定'},
+    mA:{c:'mA',n:'mA（毫安培）',d:'電流單位，1000 mA ＝ 1 A。500 mA 就是 0.5 A。',m:'mA'},
+    typeA:{c:'Type-A',n:'Type-A 接頭',d:'電腦端最常見的長方形標準 USB 接頭外形。方形的 Type-B 常見於印表機，Type-C 是小型、可正反插的新接頭。接頭外形和速度是兩回事。'},
+    ss:{c:'SSTX／SSRX',n:'SuperSpeed 線對（SSTX、SSRX）',d:'USB 3.x 新增的高速差動線對：SSTX 是傳送、SSRX 是接收，各有一對（±），和原有的 D+、D− 並存。'},
+    ocp:{c:'過流保護',n:'過流保護',d:'電流超過限制時，電路自動切斷或限流，保護 USB 埠與電腦。大部分 USB 埠都有。'},
+    chargeonly:{c:'僅充電線',n:'僅充電線',d:'只接了 VBUS 與 GND 的線，只能供電，沒有 D+、D−，所以不能傳資料。'},
+
+    noise:{c:'雜訊',n:'雜訊與共模雜訊',d:'雜訊是訊號線上不想要的干擾，來源如馬達、無線電波、鄰近線路。共模雜訊是同時、同方向、差不多大小打在 D+ 與 D− 上的雜訊，相減時會抵消。',m:'雜訊'},
+    threshold:{c:'判斷門檻',n:'判斷門檻',d:'接收端用來區分 0 與 1 的電壓分界。這裡單端用 3.3 V 的一半（1.65 V）：高於算 1，低於算 0。雜訊讓電壓越過門檻，就會誤判。',m:'判斷門檻'},
+    shield:{c:'遮蔽',n:'遮蔽（Shielding）',d:'線材外層包一層金屬網或鋁箔並接地，把外界雜訊導走，不讓它干擾裡面的訊號線。'},
+    activeext:{c:'主動式延長線',n:'主動式延長線',d:'線裡內建訊號放大或整形的晶片，可以把 USB 2.0 的距離延長到 5 m 以上。'},
+
+    nrzi:{c:'NRZI',n:'NRZI（Non-Return-to-Zero Inverted）',d:'一種編碼方式：不看電位高低，而看「有沒有翻轉」。傳 0 就翻轉，傳 1 就維持不變。好處是不需要另外的時脈線。',m:'NRZI'},
+    jk:{c:'J、K',n:'J 與 K（線路狀態）',d:'差動線的兩種狀態。全速：J＝D+ 高、D− 低；K＝D+ 低、D− 高（低速的極性相反）。J、K 只是狀態名稱，不等於位元 0、1。位元值要看狀態有沒有翻轉。',m:'J 與 K'},
+    idle:{c:'閒置',n:'閒置（Idle）',d:'沒有人在傳資料時的線路狀態，規定是 J。全速裝置在 D+ 上接 1.5 kΩ 上拉電阻，平時就把 D+ 拉高，所以線路自然停在 J。',m:'閒置'},
+    stuff:{c:'位元填充',n:'位元填充（Bit Stuffing）',d:'只要連續送出六個 1，發送端就在第六個 1 後面強制插入一個 0 讓線路翻轉，接收端看到會自動丟掉。計算時 SYNC 最後那個 1 也算，所以資料的第 5 個 1（D4）後面就可能要補 0。目的是避免太久沒有翻轉而失去時脈。',m:'位元填充'},
+    lsb:{c:'LSB／MSB',n:'LSB 與 MSB',d:'LSB＝最低位元（二進位最右邊），MSB＝最高位元（最左邊）。USB 資料從 LSB 先送。例：0x01 ＝ 00000001，最先送出的是最右邊的 1。',m:'LSB'},
+    sync:{c:'SYNC',n:'SYNC（同步欄位）',d:'每個封包的開頭，固定 8 位元（資料位元是 00000001），線上看起來是 K J K J K J K K。連續翻轉讓接收端對齊節拍。',m:'SYNC'},
+    eop:{c:'EOP',n:'EOP（End of Packet）',d:'封包結束記號：D+、D− 同時拉低（SE0）2 個位元時間，再有 1 個位元時間的 J，然後回到閒置。',m:'EOP'},
+    se0:{c:'SE0',n:'SE0（Single-Ended Zero）',d:'D+ 與 D− 同時為低電位。兩條線沒有電壓差，所以既不是 J 也不是 K，才能拿來當特殊記號。EOP 與重置（Reset）都用它。',m:'SE0'},
+    bittime:{c:'位元時間',n:'位元時間',d:'送出一個位元所花的時間。全速約 83 ns（1 ÷ 12 MHz），低速約 667 ns。',m:'位元時間'},
+    byte:{c:'位元組',n:'位元組（Byte）',d:'8 個位元。0x 開頭是十六進位，例如 0x55 ＝ 二進位 01010101。',m:'位元組'},
+    dbits:{c:'D0 ~ D7、補0',n:'D0 ~ D7 與補0',d:'D0 ~ D7 是一個位元組的 8 個資料位元，D0 最低（LSB）、D7 最高（MSB）。補0 是位元填充插進去的那個 0，不屬於資料。'},
+
+    packet:{c:'封包',n:'封包（Packet）',d:'USB 傳資料的基本單位，是一串格式固定的位元：開頭 SYNC、中間是各欄位、結尾 EOP。',m:'封包（Packet）'},
+    transaction:{c:'交易',n:'交易（Transaction）',d:'Host 完成一次資料交換的完整流程，通常是 Token → Data → Handshake 三個封包。',m:'交易（Transaction）'},
+    token:{c:'Token',n:'Token 封包',d:'由 Host 發出，說明「要對哪個位址、哪個端點，做 IN、OUT 還是 SETUP」。',m:'Token'},
+    datapkt:{c:'Data',n:'Data 封包',d:'搬運真正的資料，方向可能是 Host 到 Device，也可能是 Device 到 Host。',m:'Data'},
+    handshake:{c:'Handshake',n:'Handshake 封包',d:'回報這次交易的結果，只有 PID（ACK、NAK 或 STALL）。',m:'Handshake'},
+    pid:{c:'PID',n:'PID（Packet ID，封包識別碼）',d:'8 位元欄位，說明這是哪一種封包。前 4 位元是種類，後 4 位元是種類的反相，用來自我檢查。',m:'PID'},
+    address:{c:'位址',n:'位址（ADDR）',d:'裝置在這條匯流排上的編號，7 位元（0 ~ 127）。新插入的裝置先用 0，Host 之後再指派 1 ~ 127。',m:'位址'},
+    endpoint:{c:'端點',n:'端點（Endpoint）',d:'裝置內部的一個「窗口」，各有編號（0 ~ 15）和方向。一個裝置可以有多個端點，端點 0 專門負責控制與列舉。',m:'端點'},
+    crc:{c:'CRC',n:'CRC（循環冗餘檢查）',d:'發送端用資料算出一組檢查碼附在後面，接收端重算一次，不一樣就代表傳輸中出錯。CRC5 保護 Token，CRC16 保護資料。'},
+    inoutsetup:{c:'IN／OUT／SETUP',n:'IN、OUT、SETUP',d:'三種 Token：IN＝Host 要讀裝置的資料；OUT＝Host 要寫資料給裝置；SETUP＝Host 送出控制請求（用在列舉與設定）。'},
+    data01:{c:'DATA0／DATA1',n:'DATA0 與 DATA1',d:'兩種資料封包，輪流使用，像編號 0、1、0、1。同一個編號連續出現兩次，接收端就知道是重送的重複封包，會丟掉。'},
+    acknak:{c:'ACK／NAK／STALL',n:'ACK、NAK、STALL',d:'ACK＝收到了且正確；NAK＝裝置忙碌或還沒準備好，稍後再試（不是錯誤）；STALL＝端點出問題或不支援這個請求。'},
+    poll:{c:'輪詢',n:'輪詢（Polling）',d:'Host 定期主動問裝置「有資料嗎？」。裝置不能主動開口，所以滑鼠、鍵盤都是靠被輪詢才能回報。'},
+    bulk:{c:'大量傳輸',n:'大量傳輸（Bulk）',d:'四種傳輸類型之一，用來傳大量、要求正確但不趕時間的資料，例如隨身碟。後面「傳輸類型」那一頁會說明。'},
+
+    descriptor:{c:'描述元',n:'描述元（Descriptor）',d:'裝置內建的一張自我介紹表。裝置描述元說我是誰（VID、PID、類別）；組態描述元說我有哪些功能、端點、耗電；字串描述元放名稱文字。Host 用 GET_DESCRIPTOR 去讀。',m:'描述元（Descriptor）'},
+    request:{c:'GET_DESCRIPTOR 等請求',n:'GET_DESCRIPTOR、SET_ADDRESS、SET_CONFIGURATION',d:'Host 在端點 0 用 SETUP 送出的標準請求。GET_DESCRIPTOR＝請裝置回傳描述元；SET_ADDRESS＝指派位址；SET_CONFIGURATION＝選定組態並啟用。'},
+    vidpid:{c:'VID／PID',n:'VID 與 PID',d:'VID（Vendor ID）是廠商識別碼，由 USB-IF 核發；PID（Product ID）是產品識別碼，廠商自訂。寫在裝置韌體裡，作業系統靠它們找驅動。',m:'VID / PID'},
+    cls:{c:'裝置類別',n:'裝置類別（Class）',d:'裝置功能的分類，例如 HID（滑鼠、鍵盤）、Mass Storage（隨身碟）、CDC（虛擬序列埠）。同一類別的裝置可以共用作業系統內建的驅動程式。',m:'裝置類別'},
+    config:{c:'組態',n:'組態（Configuration）',d:'裝置的一套工作模式：會用到哪些介面與端點、需要多少電流。大多數裝置只有一個組態，SET_CONFIGURATION 就是在選定它。'},
+    reset:{c:'重置',n:'重置（Reset）',d:'Host 把 D+、D− 同時拉成 SE0 至少 10 ms，讓裝置回到初始狀態（預設位址 0）。'},
+    pull:{c:'上拉／下拉電阻',n:'上拉電阻與下拉電阻',d:'上拉是把線經電阻接到電源，沒人驅動時拉到高電位；下拉是經電阻接地，拉到低電位。USB 靠裝置端的 1.5 kΩ 上拉與 Host 端的 15 kΩ 下拉，判斷有沒有插上以及速度等級。'},
+    chirp:{c:'Chirp',n:'Chirp',d:'高速裝置在重置期間與 Host 互送的一串特殊 K、J 訊號，用來協商能不能升級到 480 Mbps。'},
+    states:{c:'裝置狀態',n:'五種裝置狀態',d:'Attached（已接上，尚未供電）→ Powered（有電，尚未重置）→ Default（重置後，使用位址 0）→ Address（已指派位址）→ Configured（已設定，可正常使用）。'},
+
+    latency:{c:'延遲',n:'延遲（Latency）',d:'從資料產生到送達之間的等待時間。滑鼠的延遲太高，游標就會一頓一頓的。',m:'低延遲'},
+    retry:{c:'重送',n:'重送（Retry）',d:'接收端發現資料有錯（CRC 不符）而沒回 ACK 時，發送端會把同一包再送一次，直到成功。',m:'重送'},
+    bandwidth:{c:'頻寬',n:'頻寬（Bandwidth）',d:'單位時間內能傳多少資料。USB 是共用的匯流排，所有裝置分享同一份頻寬。',m:'頻寬'},
+    frame:{c:'幀',n:'幀（Frame）',d:'USB 把時間切成固定長度的小段，全速是每 1 ms 一幀（高速再細分成 125 µs 的微幀）。Host 在每一幀裡安排各裝置的傳輸。',m:'幀'},
+    stream:{c:'串流',n:'串流（Streaming）',d:'資料連續不斷地送，像影片與聲音。晚到的資料就沒用了，所以不能停下來等重送。'},
+
+    bps:{c:'bps、Mbps、Gbps',n:'bps、Mbps、Gbps',d:'bps＝每秒幾個位元（bit）；M＝百萬，G＝十億。1 位元組（Byte）＝ 8 位元，所以 480 Mbps ÷ 8 ＝ 60 MB/s。',m:'Mbps'},
+    overhead:{c:'協定開銷',n:'協定開銷（Overhead）',d:'封包裡的 SYNC、PID、CRC、EOP、位元填充與握手都佔用傳輸時間，卻不是使用者的資料。所以實際速度會低於標稱速率。',m:'協定開銷'},
+    gen:{c:'Gen 1／Gen 2／Gen 2×2',n:'Gen 1、Gen 2、Gen 2×2',d:'USB 3.2 的世代命名：Gen 1 ＝ 5 Gbps，Gen 2 ＝ 10 Gbps，Gen 2×2 ＝ 20 Gbps（用兩條通道各 10 Gbps）。'},
+    usb4:{c:'USB4',n:'USB4',d:'以 Thunderbolt 3 協定為基礎的新一代規格，一律使用 Type-C 接頭，速度 20 或 40 Gbps，v2.0 可達 80 Gbps。'},
+    typec:{c:'Type-C',n:'Type-C 接頭',d:'小型、可正反插的接頭外形。外形和速度無關，一條 Type-C 線可能只有 USB 2.0 的速度。'},
+    log:{c:'對數刻度',n:'對數刻度',d:'長條每往右一段，代表「乘上固定倍數」而不是「加上固定數字」。數值差距很大時，用它才看得到小的。',m:'對數刻度'}
+  };
+  var STRIPS = {
+    2:['host','device','hub','clock','single','diff','hotplug','enum','vbus','speed','driver','com','usb2uart'],
+    3:['configd','mA','typeA','ss','ocp','chargeonly'],
+    4:['noise','threshold','shield','activeext'],
+    5:['nrzi','jk','idle','stuff','lsb','sync','eop','se0','bittime','byte','dbits'],
+    6:['packet','transaction','token','datapkt','handshake','pid','address','endpoint','crc','inoutsetup','data01','acknak','poll','bulk'],
+    7:['descriptor','vidpid','cls','request','config','reset','pull','chirp','states'],
+    8:['latency','retry','bandwidth','frame','stream'],
+    9:['bps','overhead','gen','usb4','typec','log']
+  };
+  var EXTRA_WRAPS = [
+    ['.s0-sub','diff','差動訊號'],['.s0-sub','nrzi','NRZI'],['.s0-sub','packet','封包'],['.s0-sub','enum','列舉'],
+    ['#keyPoints','host','Host'],['#keyPoints','diff','差動訊號'],['#keyPoints','nrzi','NRZI'],['#keyPoints','stuff','位元填充'],
+    ['#keyPoints','lsb','LSB'],['#keyPoints','packet','封包'],['#keyPoints','sync','SYNC'],['#keyPoints','pid','PID'],
+    ['#keyPoints','crc','CRC'],['#keyPoints','eop','EOP'],['#keyPoints','token','Token'],['#keyPoints','datapkt','Data'],
+    ['#keyPoints','handshake','Handshake'],['#keyPoints','enum','列舉'],['#keyPoints','transaction','交易']
+  ];
+  var tip = $('tip'), deck = $('deck'), tipFor = null;
+  function hideTip(){ if (tip){ tip.hidden = true; } tipFor = null; }
+  function showTip(term){
+    var g = GLOSS[term.getAttribute('data-g')];
+    if (!g) return;
+    if (tipFor === term && !tip.hidden){ hideTip(); return; }
+    tip.innerHTML = '<b>'+g.n+'</b><br>'+g.d;
+    tip.hidden = false;
+    tipFor = term;
+    var dr = deck.getBoundingClientRect(), r = term.getBoundingClientRect();
+    var w = Math.min(340, dr.width-32);
+    tip.style.width = w+'px';
+    var left = Math.max(16, Math.min(r.left-dr.left, dr.width-w-16));
+    var h = tip.offsetHeight, top = r.bottom-dr.top+8;
+    if (top+h > dr.height-84){ top = Math.max(8, r.top-dr.top-h-8); }
+    tip.style.left = left+'px';
+    tip.style.top = top+'px';
+  }
+  function wrapTerm(root,key,match){
+    var walker = document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:function(n){
+      return n.parentNode.closest('.term,button,summary') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    }});
+    var node;
+    while ((node = walker.nextNode())){
+      var i = node.nodeValue.indexOf(match);
+      if (i < 0) continue;
+      var mid = node.splitText(i);
+      mid.splitText(match.length);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'term';
+      b.setAttribute('data-g',key);
+      mid.parentNode.replaceChild(b,mid);
+      b.appendChild(mid);
+      return true;
+    }
+    return false;
+  }
+  function buildStrip(i){
+    var slide = document.querySelector('.slide[data-i="'+i+'"]');
+    var lede = slide.querySelector('.lede');
+    var keys = STRIPS[i];
+    var det = document.createElement('details');
+    det.className = 'gloss';
+    det.open = true;
+    det.innerHTML = '<summary>'+
+      '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><rect x="2.5" y="3" width="13" height="12" rx="2.5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/><path d="M6 7h6M6 10h4" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/></svg>'+
+      '<span>名詞小卡（'+keys.length+'）：先認識這些名詞</span>'+CHEV+'</summary>'+
+      '<div class="gloss-body"><div class="gchips"></div><div class="gpanel" aria-live="polite"><span class="dim">點一下上面的名詞，這裡會顯示解釋。文中有虛線底線的字也能直接點。</span></div></div>';
+    var chips = det.querySelector('.gchips'), panel = det.querySelector('.gpanel');
+    keys.forEach(function(k){
+      var g = GLOSS[k];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'gchip';
+      b.setAttribute('aria-pressed','false');
+      b.textContent = g.c;
+      b.addEventListener('click',function(){
+        Array.prototype.forEach.call(chips.children,function(x){ x.setAttribute('aria-pressed',x===b?'true':'false'); });
+        panel.innerHTML = '<b>'+g.n+'</b><br>'+g.d;
+      });
+      chips.appendChild(b);
+    });
+    lede.insertAdjacentElement('afterend',det);
+  }
+  Object.keys(STRIPS).forEach(function(k){ buildStrip(parseInt(k,10)); });
+  Object.keys(STRIPS).forEach(function(k){
+    var slide = document.querySelector('.slide[data-i="'+k+'"]');
+    var roots = slide.querySelectorAll('.lede,.tbl-wrap,.legend,.hint');
+    STRIPS[k].forEach(function(key){
+      var g = GLOSS[key];
+      if (!g || !g.m) return;
+      for (var r=0;r<roots.length;r++){ if (wrapTerm(roots[r],key,g.m)) break; }
+    });
+  });
+  EXTRA_WRAPS.forEach(function(w){
+    var root = document.querySelector(w[0]);
+    if (root) wrapTerm(root,w[1],w[2]);
+  });
+  document.addEventListener('click',function(e){
+    var t = e.target.closest ? e.target.closest('.term') : null;
+    if (t){ showTip(t); return; }
+    if (!e.target.closest('.tip')) hideTip();
+  });
+  document.addEventListener('keydown',function(e){ if (e.key === 'Escape') hideTip(); });
+  document.addEventListener('scroll',hideTip,true);
+
+  render();
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,1671 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>CH340C 翻譯官小教室</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+  /* 版面概念：全螢幕翻頁式小教室，一頁一個概念，互動元件置中，底部固定導覽列。
+     沿用 UART 小教室的米色底、青綠主色與圓角卡片，讓兩堂課看起來是同一套教材。 */
+  :root{
+    --bg:#faf7ee;
+    --surface:#ffffff;
+    --surface-2:#eef6ee;
+    --ink:#233229;
+    --muted:#566a5d;
+    --line:#d9e5da;
+    --accent:#17766a;
+    --accent-soft:#dff3ee;
+    --accent-ink:#ffffff;
+    --amber:#eeab33;
+    --amber-soft:#fbe9c8;
+    --amber-ink:#3c2a04;
+    --amber-strong:#a35f00;
+    --on-amber:#3c2a04;
+    --coral:#c2463b;
+    --coral-soft:#fdeceb;
+    --blue:#2b6f9e;
+    --wire-red:#c23a3a;
+    --wire-green:#2b8a52;
+    --wire-black:#26302a;
+    --shadow:0 18px 40px -22px rgba(35,50,41,.35);
+    --font-ui:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    --font-display:"Baloo 2","Noto Sans TC","PingFang TC",sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141d18;
+      --surface:#1c2721;
+      --surface-2:#223028;
+      --ink:#eef5ee;
+      --muted:#9db3a4;
+      --line:#31413a;
+      --accent:#5fd0bd;
+      --accent-soft:#20423c;
+      --accent-ink:#0c2320;
+      --amber:#f2c369;
+      --amber-soft:#3d3013;
+      --amber-ink:#fdf3dd;
+      --amber-strong:#f2c369;
+      --coral:#f0958c;
+      --coral-soft:#402322;
+      --blue:#7cb8e0;
+      --wire-red:#e0645c;
+      --wire-green:#6fd08c;
+      --wire-black:#0b100d;
+      --shadow:0 18px 40px -20px rgba(0,0,0,.55);
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141d18;
+    --surface:#1c2721;
+    --surface-2:#223028;
+    --ink:#eef5ee;
+    --muted:#9db3a4;
+    --line:#31413a;
+    --accent:#5fd0bd;
+    --accent-soft:#20423c;
+    --accent-ink:#0c2320;
+    --amber:#f2c369;
+    --amber-soft:#3d3013;
+    --amber-ink:#fdf3dd;
+    --amber-strong:#f2c369;
+    --coral:#f0958c;
+    --coral-soft:#402322;
+    --blue:#7cb8e0;
+    --wire-red:#e0645c;
+    --wire-green:#6fd08c;
+    --wire-black:#0b100d;
+    --shadow:0 18px 40px -20px rgba(0,0,0,.55);
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-ui);
+    -webkit-font-smoothing:antialiased;
+  }
+  .latin{font-family:var(--font-display)}
+  .mono{font-family:var(--font-mono)}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  p{margin:0}
+  button{font-family:inherit;color:inherit}
+  table{border-collapse:collapse}
+
+  /* ---------- deck shell ---------- */
+  .deck{height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .progress-track{height:5px;background:var(--surface-2);flex:none}
+  .progress-fill{height:100%;width:8%;background:linear-gradient(90deg,var(--accent),var(--amber));transition:width .45s cubic-bezier(.65,0,.35,1)}
+  .slides{flex:1;position:relative;min-height:0}
+  .slide{
+    position:absolute;inset:0;
+    display:flex;justify-content:center;
+    padding-top:clamp(18px,4vw,36px);
+    padding-bottom:clamp(88px,11vh,116px);
+    padding-left:max(clamp(16px,5vw,64px),env(safe-area-inset-left,0px));
+    padding-right:max(clamp(16px,5vw,64px),env(safe-area-inset-right,0px));
+    opacity:0;transform:translateX(36px);
+    transition:opacity .45s ease,transform .45s ease;
+    pointer-events:none;overflow-y:auto;
+  }
+  .slide.leaving-back{transform:translateX(-36px)}
+  .slide.active{opacity:1;transform:translateX(0);pointer-events:auto}
+  .slide-inner{width:100%;max-width:920px;margin:auto;display:flex;flex-direction:column;gap:18px;min-width:0}
+
+  .eyebrow{
+    display:inline-flex;align-items:center;align-self:flex-start;
+    font-family:var(--font-display);font-size:13px;font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);background:var(--accent-soft);
+    padding:6px 14px;border-radius:999px;
+  }
+  .slide h2{font-size:clamp(24px,4vw,34px);font-weight:900;line-height:1.28}
+  .slide h2 .num{font-family:var(--font-display);color:var(--accent);margin-right:8px}
+  .lede{font-size:clamp(14.5px,2vw,16.5px);line-height:1.85;max-width:68ch}
+  .lede b{color:var(--accent);font-weight:700}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow)}
+  .hint{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;line-height:1.5}
+  .hint svg{flex:none}
+
+  /* ---------- nav ---------- */
+  .nav{
+    position:fixed;left:0;right:0;bottom:0;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    padding-top:12px;
+    padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+    background:linear-gradient(180deg,transparent,var(--bg) 40%);
+    pointer-events:none;
+  }
+  .nav>*{pointer-events:auto}
+  .nav-btn{
+    width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:var(--shadow);transition:transform .15s ease;flex:none;
+  }
+  .nav-btn:hover{transform:translateY(-2px)}
+  .nav-btn:disabled{opacity:.35;cursor:default;transform:none}
+  .dots{display:flex;gap:6px;padding:0 4px;flex-wrap:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--line);border:none;cursor:pointer;transition:all .25s ease;padding:0;flex:none}
+  .dot.on{width:22px;background:var(--accent);border-radius:6px}
+  button:focus-visible,summary:focus-visible,.pin:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+  .cta{
+    align-self:flex-start;display:inline-flex;align-items:center;gap:10px;
+    background:var(--accent);color:var(--accent-ink);border:none;
+    padding:12px 22px;border-radius:999px;font-size:14.5px;font-weight:700;cursor:pointer;
+    box-shadow:var(--shadow);transition:transform .15s ease;
+  }
+  .cta:hover{transform:translateY(-2px)}
+  .cta.secondary{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+  .cta.small{padding:9px 18px;font-size:13.5px}
+  .cta:disabled{opacity:.4;cursor:default;transform:none}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+
+  /* ============ SLIDE 0 ============ */
+  .s0-inner{align-items:center;text-align:center;gap:24px}
+  .s0-badge{width:96px;height:96px;border-radius:26px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center}
+  .s0-title{font-size:clamp(34px,7vw,58px);font-weight:900;line-height:1.15}
+  .s0-title .latin{color:var(--accent);font-weight:800}
+  .s0-sub{font-size:clamp(14.5px,2.2vw,17px);color:var(--muted);max-width:52ch;line-height:1.8}
+  .s0-sub b{color:var(--ink)}
+  .pair-strip{width:min(520px,92%);height:84px}
+  .pair-strip path{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+  .p-dp{stroke:var(--accent)}
+  .p-dm{stroke:var(--amber-strong)}
+  .s0-tags{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .s0-tag{font-family:var(--font-display);font-size:12.5px;font-weight:700;letter-spacing:.03em;padding:7px 14px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
+
+  /* ============ key points / summary ============ */
+  .sum-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  @media (max-width:600px){.sum-grid{grid-template-columns:1fr}}
+  .sum-item{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.65;min-width:0}
+  .sum-item svg{flex:none;margin-top:2px}
+  .sum-item b{display:block;font-size:14px;margin-bottom:2px}
+  .thanks-note{background:var(--surface-2);border-radius:16px;padding:16px 18px;font-size:13.5px;line-height:1.85}
+
+  /* ============ flip cards ============ */
+  .letters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .flip-card{perspective:1000px;height:150px;cursor:pointer;background:transparent;border:none;padding:0}
+  .flip-inner{position:relative;width:100%;height:100%;transition:transform .55s cubic-bezier(.65,0,.35,1);transform-style:preserve-3d}
+  .flip-card.flipped .flip-inner{transform:rotateY(180deg)}
+  .flip-face{position:absolute;inset:0;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;backface-visibility:hidden;padding:10px;text-align:center;border:1px solid var(--line)}
+  .flip-front{background:var(--surface);box-shadow:var(--shadow)}
+  .flip-front .big{font-family:var(--font-display);font-size:42px;font-weight:800;color:var(--accent)}
+  .flip-front .small{font-size:12px;color:var(--muted);margin-top:2px}
+  .flip-back{background:var(--accent);color:var(--accent-ink);transform:rotateY(180deg)}
+  .flip-back .word{font-family:var(--font-display);font-weight:700;font-size:14px}
+  .flip-back .desc{font-size:12px;margin-top:6px;line-height:1.55}
+  @media (max-width:420px){.flip-back .desc{font-size:11px}.flip-card{height:168px}}
+
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+  .cmp{width:100%;min-width:480px;font-size:13px}
+  .cmp th,.cmp td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);line-height:1.6;vertical-align:top}
+  .cmp th{background:var(--surface-2);font-size:12px;color:var(--muted);font-weight:700}
+  .cmp tr:last-child td{border-bottom:none}
+  .cmp td:first-child{font-weight:700;white-space:nowrap}
+
+  /* ============ wires ============ */
+  .board-wrap{display:flex;justify-content:center}
+  .board-svg{width:100%;max-width:580px;height:auto}
+  .box-rect{fill:var(--surface);stroke:var(--line);stroke-width:2}
+  .box-title{font-family:var(--font-display);font-weight:700;font-size:15px;fill:var(--ink);text-anchor:middle}
+  .wo{fill:none;stroke:var(--muted);stroke-width:6;stroke-linecap:round}
+  .wi{fill:none;stroke-width:3;stroke-linecap:round}
+  .w-vbus .wi{stroke:var(--wire-red)}
+  .w-dm .wi{stroke:#ffffff}
+  .w-dp .wi{stroke:var(--wire-green)}
+  .w-gnd .wi{stroke:var(--wire-black)}
+  .w-ss{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round}
+  .w-drain{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:4 4;stroke-linecap:round}
+  .pin{cursor:pointer}
+  .pin rect{transition:filter .2s ease}
+  .pin:hover rect,.pin.active rect{filter:brightness(1.15)}
+  .pin.active rect{stroke:var(--ink);stroke-width:2}
+  .pin text{font-family:var(--font-display);font-weight:700;font-size:11px;text-anchor:middle}
+  .t-vbus rect{fill:var(--wire-red)} .t-vbus text{fill:#fff}
+  .t-dm rect{fill:#fff;stroke:var(--muted);stroke-width:1.5} .t-dm text{fill:#233229}
+  .t-dp rect{fill:var(--wire-green)} .t-dp text{fill:#fff}
+  .t-gnd rect{fill:var(--wire-black);stroke:var(--muted);stroke-width:1.5} .t-gnd text{fill:#fff}
+  .t-ss rect{fill:var(--blue)} .t-ss text{fill:#fff}
+  .t-drain rect{fill:var(--muted)} .t-drain text{fill:var(--surface)}
+  @keyframes flow{to{stroke-dashoffset:-28}}
+  .board-svg.live .w-vbus .wi{stroke-dasharray:7 7;animation:flow .8s linear infinite}
+  [hidden]{display:none!important}
+  .pin-info{min-height:64px;background:var(--surface-2);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.75}
+  .pin-info b{color:var(--accent)}
+
+  /* ============ differential demo ============ */
+  .plot-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;overflow-x:auto}
+  .plot-card svg{display:block;min-width:560px;width:100%;height:auto}
+  .ax{font-family:var(--font-mono);font-size:11px;fill:var(--muted)}
+  .ttl{font-family:var(--font-ui);font-size:12.5px;font-weight:700;fill:var(--ink)}
+  .bitlab{font-family:var(--font-mono);font-size:13px;font-weight:700;fill:var(--ink);text-anchor:middle}
+  .bnd{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4;fill:none}
+  .grid-l{stroke:var(--line);stroke-width:1;fill:none}
+  .thr{stroke:var(--coral);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
+  .dtrace{fill:none;stroke-width:2;stroke-linejoin:round}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+  .legend i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+  .slider-row{display:flex;flex-direction:column;gap:6px}
+  .slider-row .lab{display:flex;justify-content:space-between;font-size:13px;gap:10px;flex-wrap:wrap}
+  .slider-row .lab b{font-family:var(--font-mono);color:var(--accent)}
+  input[type=range]{width:100%;accent-color:var(--accent);height:6px}
+  .bit-compare{display:flex;flex-direction:column;gap:8px}
+  .bit-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .bit-row .row-label{font-size:12.5px;color:var(--muted);width:128px;flex:none}
+  .bits{display:flex;gap:5px;flex-wrap:wrap}
+  .bit{width:30px;height:30px;border-radius:8px;background:var(--surface);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:14px}
+  .bit.bad{border-color:var(--coral);background:var(--coral-soft);color:var(--coral)}
+  .result-box{background:var(--surface-2);border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.75}
+
+  /* ============ NRZI simulation ============ */
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{min-width:64px;padding:8px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font-family:var(--font-mono);font-weight:700;font-size:14px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .chip small{font-family:var(--font-ui);font-weight:400;font-size:10.5px;color:var(--muted)}
+  .chip.sel{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .chip.sel small{color:var(--accent-ink)}
+  .wave-wrap{background:var(--surface-2);border-radius:16px;padding:14px}
+  .wave-scroll{overflow-x:auto}
+  .wave-grid{display:grid;grid-template-columns:56px minmax(0,1fr);column-gap:8px;row-gap:4px;align-items:center}
+  .wg-label{font-size:11.5px;color:var(--muted);font-weight:700}
+  .wg-plotlabel{position:relative;height:150px}
+  .wg-plotlabel span{position:absolute;left:0;font-family:var(--font-mono);font-size:12px;font-weight:700}
+  .lab-dp{top:26px;color:var(--accent)}
+  .lab-dm{top:104px;color:var(--amber-strong)}
+  .wg-plot{position:relative;height:150px}
+  .wg-plot svg{position:absolute;inset:0;width:100%;height:150px;display:block}
+  .wg-plot svg path,.wg-plot svg line{vector-effect:non-scaling-stroke}
+  .hl{position:absolute;top:0;bottom:0;background:var(--amber);opacity:.28;border-radius:6px;pointer-events:none;display:none}
+  .wg-cells{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+  .wg-cells span{text-align:center;font-family:var(--font-mono);font-size:12px;padding:3px 0;border-radius:6px;white-space:nowrap}
+  .wg-cells.lbl span{font-family:var(--font-ui);font-size:10.5px;color:var(--muted)}
+  .wg-cells span.on{background:var(--amber-soft);color:var(--amber-ink);font-weight:700}
+  .wg-cells span.stuff{color:var(--coral);font-weight:700}
+  .now-strip{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.7;min-height:48px}
+  .now-strip b{color:var(--accent)}
+  .info-pills{display:flex;gap:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:12.5px}
+  .info-pills div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+
+  /* ============ packets ============ */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{padding:9px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font-size:13.5px;font-weight:700}
+  .tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .pkt-row{display:flex;gap:4px;overflow-x:auto;padding:8px 2px 10px}
+  .pseg{flex:1 1 0;min-width:66px;height:78px;border-radius:12px;border:2px solid var(--c);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:4px;transition:transform .15s ease}
+  .pseg .pn{font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--c)}
+  .pseg .ps{font-size:10.5px;color:var(--muted);text-align:center;line-height:1.3}
+  .pseg.sel{transform:translateY(-5px);box-shadow:var(--shadow)}
+  .k-sync{--c:var(--coral)} .k-pid{--c:var(--accent)} .k-field{--c:var(--blue)} .k-crc{--c:var(--amber-strong)} .k-eop{--c:var(--coral)}
+  .detail-box{background:var(--surface-2);border-radius:16px;padding:16px 18px;font-size:13.5px;line-height:1.8;min-height:92px}
+  .detail-box .tag{font-family:var(--font-display);font-weight:700;font-size:12.5px;letter-spacing:.04em;display:inline-block;margin-bottom:6px;padding:3px 10px;border-radius:999px;background:var(--c,var(--accent));color:var(--surface)}
+  .tx-list{display:flex;flex-direction:column;gap:8px}
+  .tx-step{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;animation:rise .4s ease both;animation-delay:var(--d,0s)}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .tx-dir{font-family:var(--font-display);font-weight:700;font-size:12px;padding:5px 10px;border-radius:999px;white-space:nowrap}
+  .tx-dir.host{background:var(--accent-soft);color:var(--accent)}
+  .tx-dir.dev{background:var(--amber-soft);color:var(--amber-ink)}
+  .tx-body{font-size:13.5px;line-height:1.6;min-width:0}
+  .tx-body b{font-family:var(--font-mono)}
+  .tx-note{font-size:12.5px;color:var(--muted);line-height:1.7}
+
+  /* ============ enumeration ============ */
+  .state-row{display:flex;gap:6px;flex-wrap:wrap}
+  .state-pill{padding:7px 12px;border-radius:999px;font-family:var(--font-display);font-weight:700;font-size:12.5px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted)}
+  .state-pill.done{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+  .state-pill.now{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .enum-card{padding:18px;display:flex;flex-direction:column;gap:14px}
+  .enum-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .enum-title{font-size:16px;font-weight:900}
+  .enum-count{font-family:var(--font-mono);font-size:12.5px;color:var(--muted)}
+  .enum-flow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center}
+  .node{border-radius:14px;padding:12px 10px;text-align:center;font-weight:700;font-size:13.5px;border:1.5px solid var(--line);background:var(--surface-2);line-height:1.4}
+  .node small{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
+  .msgs{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .msg{font-size:13px;line-height:1.6;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);min-width:0}
+  .msg.r{border-left:4px solid var(--accent)}
+  .msg.l{border-right:4px solid var(--amber-strong);text-align:right}
+  .addr-box{font-size:13px;display:flex;gap:8px;align-items:baseline}
+  .addr-box b{font-family:var(--font-mono);font-size:18px;color:var(--accent)}
+  .enum-note{background:var(--surface-2);border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.8}
+  @media (max-width:520px){.enum-flow{grid-template-columns:1fr}.msg.l{text-align:left}}
+
+  /* ============ transfer types ============ */
+  .tcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  @media (max-width:640px){.tcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .tcard{border:1.5px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+  .tcard .tn{font-size:18px;font-weight:900}
+  .tcard .te{font-family:var(--font-display);font-size:12px;color:var(--muted);font-weight:700}
+  .tcard[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow)}
+  .tcard[aria-pressed="true"] .te{color:var(--accent-ink)}
+  .tdetail{padding:16px 18px;display:grid;gap:10px}
+  .tdetail .one{font-size:15px;font-weight:700}
+  .tdl{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px 12px;font-size:13.5px;line-height:1.65;margin:0}
+  .tdl dt{color:var(--muted);font-weight:700;font-size:12.5px}
+  .tdl dd{margin:0}
+  @media (max-width:480px){.tdl{grid-template-columns:1fr;gap:2px}.tdl dd{margin-bottom:8px}}
+  .frame-bar{display:flex;gap:3px;height:46px}
+  .frame-bar div{border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--muted);border:1.5px solid var(--line);transition:all .25s ease;min-width:0;padding:0 4px;text-align:center;line-height:1.2}
+  .frame-bar div.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+  /* ============ speed ============ */
+  .speed-panel{padding:20px;display:flex;flex-direction:column;gap:16px}
+  .sp-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .sp-head .val{font-family:var(--font-display);font-size:clamp(30px,5vw,44px);font-weight:800;color:var(--accent)}
+  .sp-head .unit{font-size:13.5px;color:var(--muted)}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .stat{background:var(--surface-2);border-radius:14px;padding:12px 14px;min-width:0}
+  .stat .k{font-size:11.5px;color:var(--muted)}
+  .stat .v{font-family:var(--font-mono);font-weight:700;font-size:16px;margin-top:2px;overflow-wrap:anywhere}
+  .bars{display:flex;flex-direction:column;gap:6px}
+  .bar-btn{display:grid;grid-template-columns:minmax(86px,128px) minmax(0,1fr) 64px;gap:10px;align-items:center;background:transparent;border:1.5px solid transparent;border-radius:10px;padding:4px 6px;cursor:pointer;text-align:left;font-size:12.5px}
+  .bar-btn .track{height:12px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+  .bar-btn .fill{display:block;height:100%;border-radius:999px;background:var(--line);transition:background .2s ease}
+  .bar-btn .rt{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);text-align:right}
+  .bar-btn.sel{border-color:var(--accent);background:var(--accent-soft)}
+  .bar-btn.sel .fill{background:var(--accent)}
+  .size-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px}
+
+  /* ============ quiz ============ */
+  .quiz-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .score-pill{font-family:var(--font-display);font-weight:700;font-size:13px;background:var(--amber-soft);color:var(--amber-ink);padding:6px 14px;border-radius:999px}
+  .q-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+  .q-title{font-weight:700;font-size:14.5px;line-height:1.6}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{text-align:left;padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface-2);cursor:pointer;font-size:13.5px;line-height:1.55}
+  .opt.correct{border-color:var(--accent);background:var(--accent-soft)}
+  .opt.wrong{border-color:var(--coral);background:var(--coral-soft)}
+  .opt:disabled{cursor:default}
+  .q-explain{font-size:12.5px;color:var(--muted);line-height:1.7;display:none}
+  .q-explain.show{display:block}
+
+  /* ============ common mistakes ============ */
+  .mistakes{border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+  .mistakes summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;font-weight:700;font-size:14px;border-radius:16px}
+  .mistakes summary::-webkit-details-marker{display:none}
+  .mistakes summary .chev{margin-left:auto;transition:transform .2s ease;flex:none}
+  .mistakes[open] summary .chev{transform:rotate(180deg)}
+  .m-list{margin:0;padding:2px 14px 14px;list-style:none;display:grid;gap:10px}
+  .m-item{background:var(--surface-2);border-radius:12px;padding:12px 14px;display:grid;gap:6px;font-size:13px;line-height:1.7}
+  .m-line{display:flex;gap:10px;align-items:baseline;margin:0}
+  .m-line span:last-child{min-width:0}
+  .m-tag{flex:none;font-size:11.5px;font-weight:700;padding:1px 9px;border-radius:999px;white-space:nowrap}
+  .m-tag.bad{background:var(--coral-soft);color:var(--coral)}
+  .m-tag.eg{background:var(--amber-soft);color:var(--amber-ink)}
+  .m-tag.ok{background:var(--accent-soft);color:var(--accent)}
+
+  /* ============ glossary ============ */
+  .hint.note{display:block}
+  .term{font:inherit;color:inherit;background:none;border:none;padding:0;margin:0;cursor:help;text-align:inherit;border-bottom:2px dotted var(--accent);border-radius:2px}
+  .term:hover{background:var(--accent-soft)}
+  .tip{position:absolute;z-index:30;background:var(--surface);color:var(--ink);border:1.5px solid var(--accent);border-radius:14px;padding:12px 14px;font-size:13.5px;line-height:1.75;box-shadow:var(--shadow);max-width:340px}
+  .tip b{color:var(--accent)}
+  .gloss{border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+  .gloss summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;font-weight:700;font-size:14px;border-radius:16px}
+  .gloss summary::-webkit-details-marker{display:none}
+  .gloss summary .chev{margin-left:auto;transition:transform .2s ease;flex:none}
+  .gloss[open] summary .chev{transform:rotate(180deg)}
+  .gloss-body{padding:0 14px 14px;display:grid;gap:10px}
+  .gchips{display:flex;flex-wrap:wrap;gap:6px}
+  .gchip{border:1.5px solid var(--line);background:var(--surface-2);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer}
+  .gchip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .gpanel{background:var(--surface-2);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.8;min-height:58px}
+  .gpanel b{color:var(--accent)}
+  .gpanel .dim{color:var(--muted)}
+
+
+  /* ===== CH340C 專用 ===== */
+  :root{--usb-c:var(--blue);--uart-c:var(--accent);--bridge-c:var(--amber-strong)}
+  .lane{display:grid;grid-template-columns:minmax(0,1fr) 56px minmax(0,1fr) 56px minmax(0,1fr);gap:6px;align-items:center}
+  @media (max-width:640px){.lane{grid-template-columns:1fr;justify-items:stretch}.lane .arrow{transform:rotate(90deg);justify-self:center}}
+  .actor{border:2px solid var(--c);background:var(--surface);border-radius:18px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;min-width:0}
+  .actor b{font-size:14.5px}
+  .actor small{font-size:11.5px;color:var(--muted)}
+  .actor.us{--c:var(--usb-c)} .actor.tw{--c:var(--uart-c)}
+  .actor.mid{--c:var(--bridge-c);transition:opacity .5s ease,transform .5s ease}
+  .stage:not(.has-interp) .actor.mid{opacity:.35;border-style:dashed;transform:scale(.96)}
+  .arrow{width:44px;height:24px;color:var(--muted)}
+  .arrow line{stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-dasharray:6 6}
+  .arrow polyline{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+  .arrow.on{color:var(--accent)}
+  .arrow.on line{animation:flow .7s linear infinite}
+  .arrow.bad{color:var(--coral)}
+  .bub{border-radius:14px;padding:9px 12px;font-size:13px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);min-height:56px;min-width:0}
+  .bub.us{border-left:4px solid var(--usb-c)} .bub.tw{border-left:4px solid var(--uart-c)} .bub.mid{border-left:4px solid var(--bridge-c)}
+  .bub .en{font-family:var(--font-display);font-weight:600;font-size:13.5px}
+  .bub .dim{color:var(--muted)}
+  .stage-card{padding:16px;display:flex;flex-direction:column;gap:12px}
+  .step-title{font-size:15px;font-weight:900}
+  .tech-note{background:var(--surface-2);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.75}
+  .tech-note b{color:var(--accent)}
+
+  .chipsvg{width:100%;max-width:580px;height:auto}
+  .cp{cursor:pointer}
+  .cp rect{fill:var(--c);transition:filter .2s ease}
+  .cp text{font-family:var(--font-display);font-weight:700;font-size:12px;text-anchor:middle;fill:#fff}
+  .cp:hover rect,.cp.active rect{filter:brightness(1.15)}
+  .cp.active rect{stroke:var(--ink);stroke-width:2.5}
+  .cp:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .c-usb{--c:var(--blue)} .c-uart{--c:var(--accent)} .c-pwr{--c:var(--coral)} .c-gnd{--c:var(--wire-black)} .c-ctl{--c:var(--amber-strong)}
+  .chip-body{fill:var(--surface);stroke:var(--line);stroke-width:2.5}
+  .chip-txt{font-family:var(--font-display);font-weight:800;font-size:20px;fill:var(--ink);text-anchor:middle}
+  .chip-sub{font-size:12px;fill:var(--muted);text-anchor:middle;font-family:var(--font-ui)}
+  .side-lab{font-size:12.5px;font-weight:700;text-anchor:middle;font-family:var(--font-ui)}
+
+  .uart-svg{display:block;width:100%;min-width:520px;height:auto}
+  .pkt-flow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:center}
+  @media (max-width:640px){.pkt-flow{grid-template-columns:1fr}.pkt-flow .mid-arrow{transform:rotate(90deg);justify-self:center}}
+  .mid-arrow{font-size:12px;color:var(--bridge-c);font-weight:700;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .buf-row{display:flex;gap:6px;flex-wrap:wrap;min-height:44px;align-items:center}
+  .buf-cell{width:40px;height:40px;border-radius:10px;border:2px solid var(--bridge-c);background:var(--amber-soft);color:var(--amber-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:15px;line-height:1.1;animation:rise .3s ease both}
+  .buf-cell small{font-size:9.5px;font-weight:400}
+  .buf-empty{font-size:12.5px;color:var(--muted)}
+  .console{background:#16201b;color:#d9f0df;border-radius:12px;padding:10px 14px;font-family:var(--font-mono);font-size:13px;line-height:1.7;min-height:44px;word-break:break-all}
+  .log{display:flex;flex-direction:column;gap:6px;max-height:190px;overflow-y:auto}
+  .log div{font-size:12.5px;line-height:1.6;padding:6px 10px;border-radius:10px;background:var(--surface-2);animation:rise .3s ease both}
+  .log .nak{background:var(--coral-soft);color:var(--coral)}
+  .log .ok{background:var(--accent-soft)}
+  .cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  @media (max-width:640px){.cols2{grid-template-columns:1fr}}
+  .panel-title{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px}
+  .res-big{font-family:var(--font-mono);font-size:clamp(20px,4vw,28px);font-weight:700;letter-spacing:.05em;word-break:break-all}
+  .res-big.good{color:var(--accent)} .res-big.bad{color:var(--coral)}
+
+  .wsvg{width:100%;max-width:580px;height:auto}
+  .wpin{cursor:pointer}
+  .wpin circle{fill:var(--surface);stroke:var(--ink);stroke-width:2.5;transition:all .15s ease}
+  .wpin:hover circle{fill:var(--amber-soft)}
+  .wpin.sel circle{fill:var(--amber);stroke:var(--amber-strong);stroke-width:3.5}
+  .wpin.used circle{fill:var(--accent);stroke:var(--accent)}
+  .wpin:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  .wlab{font-family:var(--font-display);font-weight:700;font-size:14px;fill:var(--ink)}
+  .wlab.l{text-anchor:end} .wlab.r{text-anchor:start}
+  .wire{fill:none;stroke-width:4;stroke-linecap:round}
+  .verdict{display:grid;gap:8px}
+  .vrow{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.65;background:var(--surface-2);border-radius:12px;padding:10px 14px}
+  .vrow .badge{flex:none;font-size:11.5px;font-weight:700;padding:2px 10px;border-radius:999px;margin-top:1px}
+  .badge.ok{background:var(--accent-soft);color:var(--accent)}
+  .badge.no{background:var(--coral-soft);color:var(--coral)}
+  .badge.warn{background:var(--amber-soft);color:var(--amber-ink)}
+  .volt-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+  .seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+  .seg button{border:none;background:transparent;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+  .sel-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:13px}
+  .sel-row .lab{width:96px;color:var(--muted);font-weight:700;font-size:12.5px;flex:none}
+  .gal-note{font-size:12.5px;color:var(--muted);line-height:1.7}
+
+  .rsp::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c);margin-right:7px;vertical-align:-1px;border:1.5px solid var(--ink)}
+  /* registration scene */
+  .rgs *{animation-fill-mode:both}
+  .rg-t{font-family:var(--font-ui);font-size:11.5px;fill:var(--ink)}
+  .rg-t.b{font-weight:700}
+  .rg-t.s{font-size:10px;fill:var(--muted)}
+  .rg-t.m{font-family:var(--font-mono);font-weight:700;font-size:11px}
+  .rg-in{animation:rgIn .6s ease both}
+  .rg-pop{transform-box:fill-box;transform-origin:center;animation:rgPop .6s ease both}
+  .rg-plug{animation:rgPlug 1s ease-out both}
+  .rg-pulse{animation:rgPulse 1.2s linear infinite}
+  .rg-down{animation:rgDown 1s ease-in-out both}
+  .rg-fly{animation:rgFly 1.1s ease-in-out both}
+  .rg-bits{animation:rgBits 1s linear infinite}
+  .rg-glow{animation:rgGlow .8s ease both}
+  @keyframes rgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes rgPop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:1}}
+  @keyframes rgPlug{from{transform:translateX(-90px);opacity:.3}to{transform:none;opacity:1}}
+  @keyframes rgPulse{from{transform:translateX(0);opacity:1}to{transform:translateX(150px);opacity:0}}
+  @keyframes rgDown{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(54px);opacity:1}}
+  @keyframes rgFly{0%{transform:translateX(0);opacity:1}100%{transform:translateX(150px);opacity:1}}
+  @keyframes rgBits{from{transform:translateX(0);opacity:1}to{transform:translateX(70px);opacity:0}}
+  @keyframes rgGlow{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.rgs *{animation:none!important}}
+  .enum-pill-row{display:flex;gap:6px;flex-wrap:wrap}
+  .myth-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  @media (max-width:700px){.myth-grid{grid-template-columns:1fr}}
+  .myth{perspective:1000px;height:190px;cursor:pointer;background:transparent;border:none;padding:0}
+  .myth .flip-face{padding:14px;align-items:flex-start;justify-content:flex-start;text-align:left;gap:6px}
+  .myth .flip-front{background:var(--coral-soft);border-color:var(--coral)}
+  .myth .tagline{font-family:var(--font-display);font-size:12px;font-weight:700;letter-spacing:.06em}
+  .myth .flip-front .tagline{color:var(--coral)}
+  .myth .flip-back .tagline{color:var(--accent-ink);opacity:.85}
+  .myth .stmt{font-size:14.5px;font-weight:900;line-height:1.5}
+  .myth .why{font-size:12.5px;line-height:1.65}
+  .myth .flip-back{align-items:flex-start;justify-content:flex-start}
+  .take{background:var(--accent);color:var(--accent-ink);border-radius:18px;padding:18px 20px;font-size:clamp(15px,2.4vw,18px);font-weight:900;line-height:1.7}
+  @media (prefers-reduced-motion:reduce){.arrow.on line{animation:none!important}.buf-cell,.log div{animation:none!important}.actor.mid{transition:none!important}}
+</style>
+
+<div class="deck" id="deck">
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="slides" id="slides">
+
+    <!-- 0 封面 -->
+    <section class="slide" data-i="0">
+      <div class="slide-inner s0-inner">
+        <div class="s0-badge">
+          <svg width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true">
+            <rect x="3" y="14" width="18" height="32" rx="5" fill="var(--blue)" opacity=".18" stroke="var(--blue)" stroke-width="2.5"/>
+            <rect x="39" y="14" width="18" height="32" rx="5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.5"/>
+            <rect x="21" y="20" width="18" height="20" rx="4" fill="var(--amber)" stroke="var(--amber-strong)" stroke-width="2.5"/>
+            <path d="M12 30h-6M54 30h-6" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="eyebrow">電路設計課 · CIRCUIT DESIGN</div>
+        <h1 class="s0-title"><span class="latin">CH340C</span> 翻譯官</h1>
+        <p class="s0-sub" id="s0sub">USB 說英文，UART 說中文，電腦和單晶片要對話，中間得有一位口譯員。這一堂用 CH340C 帶你看翻譯怎麼進行，並動手做 TX／RX 接線小實驗。</p>
+        <div class="s0-tags"><span class="s0-tag latin">USB ⇄ UART</span><span class="s0-tag latin">BRIDGE</span><span class="s0-tag">接線小實驗</span></div>
+        <button class="cta" id="startBtn" type="button">開始上課
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 8h8M8 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- 1 本堂重點 -->
+    <section class="slide" data-i="1">
+      <div class="slide-inner">
+        <div class="eyebrow">本堂重點 · KEY POINTS</div>
+        <h2>這一堂你要帶走的 6 件事</h2>
+        <p class="lede">先看結論，後面每一頁用小實驗確認。概念頁底部都附三個最常見的錯誤，各配一個實際例子。有虛線底線的名詞可以直接點開看解釋，每頁還有「名詞小卡」。</p>
+        <div class="sum-grid" id="keyPoints"></div>
+      </div>
+    </section>
+
+    <!-- 2 外交官遇上台灣人 -->
+    <section class="slide" data-i="2">
+      <div class="slide-inner">
+        <div class="eyebrow">01 · 為什麼需要翻譯官</div>
+        <h2><span class="num latin">01</span>外交官遇上台灣人</h2>
+        <p class="lede">電腦的 USB 孔講的是一套嚴謹的協定：資料被包成一個個封包，用差動訊號送出，像美國外交官的正式英文。單晶片（MCU）的 TX／RX 腳講的是 UART：一個位元組、一個位元慢慢送，像台灣人習慣的口語中文。兩邊直接相接只會各說各話，所以中間要有一位口譯員，也就是 CH340C 這種橋接器。</p>
+        <div class="card stage-card stage" id="stage">
+          <div class="step-title" id="stTitle"></div>
+          <div class="lane">
+            <div class="actor us">
+              <svg width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="15" r="9" fill="var(--blue)"/><path d="M8 44c0-10 7-17 16-17s16 7 16 17z" fill="var(--blue)"/><path d="M24 27l-3 8 3 3 3-3z" fill="#fff"/></svg>
+              <b>美國外交官</b><small>USB 主機（電腦）</small></div>
+            <svg class="arrow" id="arL" viewBox="0 0 44 24" aria-hidden="true"><line x1="3" y1="12" x2="37" y2="12"/><polyline points="30,5 38,12 30,19"/></svg>
+            <div class="actor mid" id="interp">
+              <svg width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="9" width="30" height="30" rx="7" fill="var(--amber)" stroke="var(--amber-strong)" stroke-width="2.5"/><path d="M16 20h16M16 28h16" stroke="var(--amber-ink)" stroke-width="3" stroke-linecap="round"/></svg>
+              <b>口譯員 CH340C</b><small>橋接器</small></div>
+            <svg class="arrow" id="arR" viewBox="0 0 44 24" aria-hidden="true"><line x1="3" y1="12" x2="37" y2="12"/><polyline points="30,5 38,12 30,19"/></svg>
+            <div class="actor tw">
+              <svg width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="15" r="9" fill="var(--accent)"/><path d="M8 44c0-10 7-17 16-17s16 7 16 17z" fill="var(--accent)"/></svg>
+              <b>台灣人</b><small>UART 單晶片（MCU）</small></div>
+          </div>
+          <div class="lane" style="align-items:stretch">
+            <div class="bub us" id="bUS"></div><span></span><div class="bub mid" id="bMid"></div><span></span><div class="bub tw" id="bTW"></div>
+          </div>
+          <div class="tech-note" id="stTech"></div>
+          <div class="btn-row">
+            <button class="cta small secondary" id="stPrev" type="button">上一步</button>
+            <button class="cta small" id="stNext" type="button">下一步</button>
+            <button class="cta small secondary" id="stPlay" type="button">自動播放</button>
+            <span class="enum-count" id="stCount" style="align-self:center"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 認識 CH340C -->
+    <section class="slide" data-i="3">
+      <div class="slide-inner">
+        <div class="eyebrow">02 · 認識口譯員</div>
+        <h2><span class="num latin">02</span>CH340C 長什麼樣子</h2>
+        <p class="lede">CH340C 是沁恒（WCH）的 USB 轉 UART 晶片。USB 那一側只要 UD+、UD− 兩條線接到電腦；UART 那一側用 TXD、RXD 傳資料，另外有 VCC 和 GND 供電。它內建振盪器，不必外接石英，電壓可以是 3.3V 或 5V。點一下晶片上的腳位，看每一腳負責什麼。</p>
+        <div class="board-wrap">
+          <svg class="chipsvg" id="chipSvg" viewBox="0 0 560 300" role="group" aria-label="CH340C 腳位示意圖（示意，非實際腳位順序）"></svg>
+        </div>
+        <div class="pin-info" id="chipInfo" aria-live="polite">點一個彩色腳位，這裡會說明它的工作。</div>
+        <p class="hint"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M7 6.2V10M7 4v.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>示意圖只標功能名稱，實際腳位編號與電壓接法請以 WCH 官方資料表為準。</p>
+      </div>
+    </section>
+
+    <!-- 4 電腦 -> 單晶片 -->
+    <section class="slide" data-i="4">
+      <div class="slide-inner">
+        <div class="eyebrow">03 · 英文翻成中文</div>
+        <h2><span class="num latin">03</span>電腦 → 單晶片</h2>
+        <p class="lede">電腦把要送的資料放進 USB 封包。CH340C 先用 CRC 檢查碼確認沒有錯，再取出裡面的位元組，改用 UART 的說法一次送一個：先拉低一個 Start 位元，接著 8 個資料位元（LSB 先送），最後拉高 Stop 位元收尾。這種格式常寫成 8N1。選一個字元，拖動滑桿看它在 TXD 上怎麼一格一格送出。</p>
+        <div class="chip-row" id="chars"></div>
+        <div class="pkt-flow">
+          <div>
+            <div class="panel-title">USB 側：收到的封包</div>
+            <div class="pkt-row" id="usbPkt"></div>
+          </div>
+          <div class="mid-arrow"><span>CH340C</span><span>檢查 CRC<br>取出資料</span><svg width="28" height="18" viewBox="0 0 28 18" fill="none" aria-hidden="true"><path d="M2 9h22M17 3l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="detail-box" id="pktDetail"></div>
+        </div>
+        <div class="wave-wrap">
+          <div class="panel-title">UART 側：TXD 上的波形（8N1，閒置為高電位）</div>
+          <div class="wave-scroll"><svg class="uart-svg" id="uartSvg" viewBox="0 0 520 150" role="img" aria-label="UART 波形"></svg></div>
+        </div>
+        <div class="slider-row">
+          <div class="lab"><span>目前位元</span><b id="bitNow"></b></div>
+          <input type="range" id="bitSlider" min="0" max="11" step="1" value="0" aria-label="目前位元">
+        </div>
+        <div class="now-strip" id="uartNow"></div>
+        <div class="info-pills" id="uartPills"></div>
+      </div>
+    </section>
+
+    <!-- 5 單晶片 -> 電腦 -->
+    <section class="slide" data-i="5">
+      <div class="slide-inner">
+        <div class="eyebrow">04 · 中文翻成英文</div>
+        <h2><span class="num latin">04</span>單晶片 → 電腦</h2>
+        <p class="lede">反方向剛好相反。單晶片從 TX 一個字一個字說話，CH340C 先把它們收進緩衝區暫存。USB 的規則是主機問了裝置才能答，所以資料要等電腦送來一個 IN 詢問（輪詢）才會被打包送回去。緩衝區是空的時候，CH340C 回 NAK，意思是「還沒有，等一下再問」。</p>
+        <div class="cols2">
+          <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="panel-title">單晶片（UART）</div>
+            <div class="btn-row"><button class="cta small" id="mcuSend" type="button">單晶片說下一個字</button></div>
+            <div class="hint" id="mcuHint"></div>
+            <div class="panel-title">CH340C 緩衝區</div>
+            <div class="buf-row" id="bufRow"></div>
+          </div>
+          <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="panel-title">電腦（USB 主機）</div>
+            <div class="btn-row"><button class="cta small secondary" id="pcPoll" type="button">電腦詢問（IN）</button><button class="cta small secondary" id="pcReset" type="button">重來</button></div>
+            <div class="panel-title">序列埠終端機收到</div>
+            <div class="console" id="pcScreen">&nbsp;</div>
+          </div>
+        </div>
+        <div class="log" id="pollLog" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- 6 鮑率 -->
+    <section class="slide" data-i="6">
+      <div class="slide-inner">
+        <div class="eyebrow">05 · 說話的速度</div>
+        <h2><span class="num latin">05</span>語速不同，就變亂碼</h2>
+        <p class="lede">UART 沒有時脈線，雙方只能事先約好說話的速度，這個速度叫鮑率，單位是 bps。接收端偵測到 Start 位元的下降緣後，照自己的鮑率在每一位元的正中間取樣。兩邊差太多，取樣點會慢慢滑到錯的位元上，結果就是亂碼。調調看下面的設定。</p>
+        <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div class="sel-row"><span class="lab">單晶片送出</span><div class="seg" id="segS"></div></div>
+          <div class="sel-row"><span class="lab">電腦端設定</span><div class="seg" id="segR"></div></div>
+          <div class="slider-row">
+            <div class="lab"><span>接收端時脈誤差</span><b id="offLab">0%</b></div>
+            <input type="range" id="offSlider" min="-12" max="12" step="1" value="0" aria-label="接收端時脈誤差">
+          </div>
+        </div>
+        <div class="cols2">
+          <div class="result-box"><div class="panel-title">單晶片送出的字</div><div class="res-big mono">Hello</div></div>
+          <div class="result-box"><div class="panel-title">電腦收到的字</div><div class="res-big mono" id="rxText"></div></div>
+        </div>
+        <div class="now-strip" id="baudNote"></div>
+      </div>
+    </section>
+
+    <!-- 7 接線 -->
+    <section class="slide" data-i="7">
+      <div class="slide-inner">
+        <div class="eyebrow">06 · 接線小實驗</div>
+        <h2><span class="num latin">06</span>TX／RX 接線小實驗</h2>
+        <p class="lede">接線有三個重點。第一，說話的嘴要對著對方的耳朵：CH340C 的 TXD 接單晶片的 RX，RXD 接 TX。第二，兩邊要共地，訊號才有同一個參考點。第三，電壓準位要相符：單晶片的 UART 腳常用 TTL 準位，3.3V 的單晶片別直接吃 5V 的訊號。先點一個左邊腳位，再點一個右邊腳位來接線；再點一次已接的線可以拆掉。</p>
+        <div class="btn-row" id="presets"></div>
+        <div class="board-wrap"><svg class="wsvg" id="wireSvg" viewBox="0 0 560 250" role="group" aria-label="接線區"></svg></div>
+        <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+          <div class="sel-row"><span class="lab">CH340C 電壓</span><div class="seg" id="segVc"></div></div>
+          <div class="sel-row"><span class="lab">單晶片電壓</span><div class="seg" id="segVm"></div></div>
+        </div>
+        <div class="verdict" id="verdict" aria-live="polite"></div>
+        <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+          <div class="panel-title">邏輯準位：Vcc = 5V 時，多少伏算 0、多少伏算 1？</div>
+          <div class="seg" id="segTT" style="align-self:flex-start;flex-wrap:wrap"></div>
+          <div class="plot-card"><svg id="ttlSvg" viewBox="0 0 560 232" role="img" aria-label="TTL 準位：輸出 VOL 0.5V、VOH 2.4V，輸入 VIL 0.8V、VIH 2.0V"></svg></div>
+          <div class="legend"><span><i style="background:var(--ink)"></i>實線＝VIL，低於它判為低電位</span><span><i style="background:repeating-linear-gradient(90deg,var(--ink) 0 6px,transparent 6px 10px)"></i>虛線＝VIH，高於它判為高電位</span></div>
+          <div class="slider-row"><div class="lab"><span>線上的電壓</span><b id="ttlV"></b></div><input type="range" id="ttlSlider" min="0" max="5" step="0.1" value="3.3" aria-label="線上電壓"></div>
+          <div class="btn-row"><button class="cta small secondary" id="ttl0" type="button">0V</button><button class="cta small secondary" id="ttl33" type="button">3.3V</button><button class="cta small secondary" id="ttl5" type="button">5V</button></div>
+          <div class="verdict" id="ttlRead" aria-live="polite"></div>
+          <p class="hint note" id="ttlNote"></p>
+          <div class="now-strip"><b>重點：</b>CH340C 在 5V 時輸入門檻是 VIH ≥ 2.3V，所以 3.3V 單晶片的 TX 可以直接接 CH340C 的 RXD。危險的是反方向：CH340C 的 TXD 輸出約 5V（VOH ≥ 4.4V），直接接 3.3V 單晶片的 RX 可能損壞它。ATmega328P 這類單晶片的輸入門檻與標準 TTL 不同，請看各自資料手冊。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 自動重置 -->
+    <section class="slide" data-i="8">
+      <div class="slide-inner">
+        <div class="eyebrow">07 · 自動重置燒錄</div>
+        <h2><span class="num latin">07</span>DTR# 如何讓 Arduino 自動重置</h2>
+        <p class="lede">Arduino（ATmega328P）的 PC6（第 1 腳）就是 RESET#，重置腳，低電位有效。它用一顆 10 kΩ 上拉電阻接 5V 保持高電位，同時經一顆 0.1 µF 電容接到 CH340C 的 DTR#。電腦開啟序列埠時 DTR# 被拉低，電容把這個下降的瞬間傳給 RESET#，形成一個負脈衝，MCU 因此重置並進入 bootloader 等待上傳程式，這就是自動重置燒錄。</p>
+        <div class="board-wrap"><svg class="wsvg" id="rstSvg" viewBox="0 0 560 190" role="img" aria-label="DTR# 經 0.1 µF 電容接到 RESET#，並有 10 kΩ 上拉電阻接 5V"></svg></div>
+        <div class="state-row" id="rsPills"></div>
+        <div class="now-strip" id="rsNote" aria-live="polite"></div>
+        <div class="btn-row"><button class="cta small secondary" id="rsPrev" type="button">上一步</button><button class="cta small" id="rsNext" type="button">下一步</button></div>
+        <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+          <div class="panel-title">RESET# 腳的電壓長什麼樣子（示意）</div>
+          <div class="sel-row"><span class="lab">電容 C</span><div class="seg" id="segC"></div></div>
+          <div class="sel-row"><span class="lab">上拉電阻 R</span><div class="seg" id="segRp"></div></div>
+          <div class="plot-card"><svg id="rstPlot" viewBox="0 0 520 206" role="img" aria-label="DTR# 與 RESET# 的電壓波形"></svg></div>
+          <div class="legend"><span><i style="background:var(--blue)"></i>DTR#</span><span><i style="background:var(--coral)"></i>RESET#</span><span>色塊＝上方目前步驟對應的時間範圍</span></div>
+          <div class="now-strip" id="rstCalc"></div>
+          <div class="verdict" id="rstCmp" aria-live="polite"></div>
+        </div>
+        <p class="hint note">虛線畫在 0.2 VCC（5V 供電時 1.0V）：RESET# 低於它就視為低電位。依 Microchip 資料手冊（ATmega328PB 的 Table 33-6），RESET 腳門檻 VRST 最小 0.2 VCC、最大 0.9 VCC，這裡採用最嚴格的下限 0.2 VCC：只要低於它，無論門檻落在範圍內哪裡都一定算低電位，算出來的低電位時間是保守的（最短的）。tRST（RESET 腳最短脈衝寬度）為 2.5 µs，低電位的時間要比它長才能保證產生重置。以上數值僅供參考，圖也忽略了 MCU 內部保護二極體與寄生電容。</p>
+      </div>
+    </section>
+
+    <!-- 9 報到 -->
+    <section class="slide" data-i="9">
+      <div class="slide-inner">
+        <div class="eyebrow">08 · 口譯員報到</div>
+        <h2><span class="num latin">08</span>電腦怎麼認得它</h2>
+        <p class="lede">接好線之後，電腦還得先認識這位口譯員。插上 USB 後，電腦會做列舉，讀出它的身分（VID:PID）；接著載入對應的驅動程式，才會多出一個 COM 埠給應用程式用。這個 COM 埠是驅動模擬出來的虛擬序列埠，USB 那一側仍然是 USB。</p>
+        <div class="state-row" id="rgPills"></div>
+        <div class="card enum-card">
+          <div class="enum-top"><div class="enum-title" id="rgTitle"></div><div class="enum-count" id="rgCount"></div></div>
+          <div class="board-wrap"><svg class="wsvg rgs" id="rgSvg" viewBox="0 0 560 240" role="img" aria-label="電腦認識 CH340C 的動畫示意"></svg></div>
+          <div class="enum-note" id="rgBody"></div>
+          <div class="btn-row"><button class="cta small secondary" id="rgPrev" type="button">上一步</button><button class="cta small" id="rgNext" type="button">下一步</button><button class="cta small secondary" id="rgReplay" type="button">重播動畫</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 迷思 -->
+    <section class="slide" data-i="10">
+      <div class="slide-inner">
+        <div class="eyebrow">09 · 迷思翻轉</div>
+        <h2><span class="num latin">09</span>三個最常見的誤解</h2>
+        <p class="lede">先看錯誤說法，點一下卡片翻到正確說法。</p>
+        <div class="myth-grid" id="mythGrid"></div>
+        <p class="hint"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M7 6.2V10M7 4v.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>點一下卡片翻面</p>
+      </div>
+    </section>
+
+    <!-- 10 小測驗 -->
+    <section class="slide" data-i="11">
+      <div class="slide-inner">
+        <div class="eyebrow">小測驗 · QUIZ</div>
+        <div class="quiz-head"><h2>檢查一下你學會了沒</h2><span class="score-pill" id="score">0 / 5</span></div>
+        <div id="quizList" style="display:grid;gap:12px"></div>
+      </div>
+    </section>
+
+    <!-- 11 總結 -->
+    <section class="slide" data-i="12">
+      <div class="slide-inner">
+        <div class="eyebrow">總結</div>
+        <h2>今天學到了什麼？</h2>
+        <div class="take">USB 說英文，UART 說中文，CH340C 在中間逐句翻譯，橋接器讓電腦和單晶片能對話。</div>
+        <div class="sum-grid" id="sumGrid"></div>
+        <div class="thanks-note"><b>動手做做看：</b>用 USB 轉 UART 模組接一塊 Arduino 或 ESP32，在終端機把鮑率設成與程式相同，傳一個字元看看；再故意把 TX 接 TX，觀察什麼都收不到。<br><br><b>接著可以研究：</b>RTS# 的其他用途，以及 CP2102、ATmega16U2 等其他橋接晶片的差異。</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+  <div class="nav">
+    <button class="nav-btn" id="prevBtn" type="button" aria-label="上一頁"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="dots" id="dots"></div>
+    <button class="nav-btn" id="nextBtn" type="button" aria-label="下一頁"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var CHEV = '<svg class="chev" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  /*PURE-START*/
+  function sqPath(levels,u,yHi,yLo,x0){
+    var d = '', prev = null;
+    levels.forEach(function(b,i){
+      var y = b ? yHi : yLo, x = x0 + i*u;
+      if (i === 0){ d += 'M'+x+' '+y; }
+      else if (y !== prev){ d += ' L'+x+' '+y; }
+      d += ' L'+(x+u)+' '+y;
+      prev = y;
+    });
+    return d;
+  }
+  /* UART 8N1：Start(0) + D0..D7（LSB 先）+ Stop(1) */
+  function uartFrame(byte){
+    var f = [0];
+    for (var i=0;i<8;i++){ f.push((byte>>i)&1); }
+    f.push(1);
+    return f;
+  }
+  /* 接收端以 rxBaud 取樣、送出端以 txBaud 發送；回傳解出的位元組與是否 framing error */
+  function decodeByte(byte,txBaud,rxBaud){
+    var f = uartFrame(byte), bits = [];
+    for (var k=0;k<10;k++){
+      var t = (k+0.5)/rxBaud;
+      var j = Math.floor(t*txBaud);
+      bits.push(j >= 10 ? 1 : f[j]);
+    }
+    var v = 0;
+    for (var i=0;i<8;i++){ v |= bits[1+i] << i; }
+    return {value:v, framing:!(bits[0]===0 && bits[9]===1)};
+  }
+  function wireVerdict(pairs,vc,vm){
+    function has(a,b){ return pairs.some(function(p){ return p[0]===a && p[1]===b; }); }
+    function used(side,id){ return pairs.some(function(p){ return p[side==='L'?0:1]===id; }); }
+    var r = {};
+    r.p2m = has('TXD','RX');
+    r.m2p = has('RXD','TX');
+    r.gnd = has('GND','GND');
+    r.p2mWhy = r.p2m ? '通了。TXD（嘴）接到 RX（耳朵）。' :
+      has('TXD','TX') ? 'TXD 接到 TX：兩張嘴對著彼此，沒有人在聽。' :
+      has('TXD','GND') ? 'TXD 接到地線：訊號被拉到 0V，等於短路。' :
+      used('L','TXD') ? 'TXD 接錯腳了。' : 'TXD 還沒接。';
+    r.m2pWhy = r.m2p ? '通了。TX（嘴）接到 RXD（耳朵）。' :
+      has('RXD','RX') ? 'RXD 接到 RX：兩隻耳朵對著彼此，沒有人在說。' :
+      has('RXD','GND') ? 'RXD 接到地線，收不到任何資料。' :
+      used('L','RXD') ? 'RXD 接錯腳了。' : 'RXD 還沒接。';
+    r.gndWhy = r.gnd ? '已共地，兩邊 0V 是同一個參考點。' : '沒有共地：兩邊對「0V 在哪裡」沒有共識，資料可能亂跳或完全不通。';
+    r.volt = (vc === vm) ? 'ok' : (vc === 5 && vm === 3.3 ? 'bad' : 'warn');
+    r.voltWhy = r.volt === 'ok' ? '電壓準位相同，沒問題。' :
+      r.volt === 'bad' ? 'CH340C 的 TXD 輸出約 5V，直接進 3.3V 單晶片的 RX，可能損壞接腳。請改用 3.3V 供電、分壓或電平轉換。（反方向：3.3V 單晶片的 TX 進 CH340C 的 RXD，5V 時 VIH ≥ 2.3V，通常可以。）' :
+      'CH340C 輸出 3.3V，5V 的單晶片多半讀得到高電位，但餘裕很小，雜訊大時可能出錯。';
+    r.allOk = r.p2m && r.m2p && r.gnd && r.volt !== 'bad';
+    return r;
+  }
+  /*PURE-END*/
+
+  /* ---------------- deck nav ---------------- */
+  var TOTAL = 13, cur = 0;
+  var slidesEl = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var dotsWrap = $('dots'), progressFill = $('progressFill'), prevBtn = $('prevBtn'), nextBtn = $('nextBtn');
+  var dotTitles = ['封面','本堂重點','外交官與台灣人','認識 CH340C','電腦到單晶片','單晶片到電腦','鮑率','接線小實驗','自動重置','報到','迷思','小測驗','總結'];
+  for (var di=0; di<TOTAL; di++){
+    var d = document.createElement('button');
+    d.type = 'button';
+    d.className = 'dot' + (di===0 ? ' on' : '');
+    d.setAttribute('aria-label','跳到第 '+(di+1)+' 頁：'+dotTitles[di]);
+    d.addEventListener('click',(function(idx){ return function(){ goTo(idx); }; })(di));
+    dotsWrap.appendChild(d);
+  }
+  var dots = dotsWrap.querySelectorAll('.dot');
+  function render(prevIdx){
+    slidesEl.forEach(function(s){
+      var idx = parseInt(s.getAttribute('data-i'),10);
+      var on = idx === cur;
+      s.classList.remove('active','leaving-back');
+      if (on){ s.classList.add('active'); }
+      else if (prevIdx !== undefined && idx < cur){ s.classList.add('leaving-back'); }
+      s.inert = !on;
+    });
+    dots.forEach(function(dd,idx){ dd.classList.toggle('on', idx===cur); });
+    progressFill.style.width = (((cur+1)/TOTAL)*100)+'%';
+    prevBtn.disabled = cur===0;
+    nextBtn.disabled = cur===TOTAL-1;
+  }
+  function goTo(i){
+    var prevIdx = cur;
+    cur = Math.max(0, Math.min(TOTAL-1, i));
+    slidesEl[cur].scrollTop = 0;
+    hideTip();
+    if (cur !== 2) stopPlay();
+    render(prevIdx);
+  }
+  prevBtn.addEventListener('click',function(){ goTo(cur-1); });
+  nextBtn.addEventListener('click',function(){ goTo(cur+1); });
+  $('startBtn').addEventListener('click',function(){ goTo(1); });
+  document.addEventListener('keydown',function(e){
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    if (e.key === 'ArrowRight') goTo(cur+1);
+    if (e.key === 'ArrowLeft') goTo(cur-1);
+  });
+  var touchX = null, touchY = null;
+  $('slides').addEventListener('touchstart',function(e){ touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; },{passive:true});
+  $('slides').addEventListener('touchend',function(e){
+    if (touchX === null) return;
+    var dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy)*1.6){ goTo(dx > 0 ? cur-1 : cur+1); }
+    touchX = null;
+  },{passive:true});
+
+  /* ---------------- slide 1 / 11 lists ---------------- */
+  var ICON = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5.5 9.3l2.4 2.4 4.6-5" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function fillItems(id,items){
+    $(id).innerHTML = items.map(function(it){ return '<div class="sum-item">'+ICON+'<div><b>'+it[0]+'</b>'+it[1]+'</div></div>'; }).join('');
+  }
+  fillItems('keyPoints',[
+    ['兩種語言','USB 說英文（封包），UART 說中文（序列幀），不能直接相接。'],
+    ['口譯員','CH340C 是橋接器，一側接 USB、一側接 UART，兩邊都聽得懂。'],
+    ['電腦到單晶片','拆開 USB 封包取出位元組，再用 Start、8 位元、Stop 一個一個送出。'],
+    ['單晶片到電腦','UART 的字先進緩衝區，等電腦的 IN 詢問才打包送回。'],
+    ['三件要顧的事','鮑率要一致；TX 接 RX、RX 接 TX 並共地；電壓準位要相符。'],
+    ['自動重置','DTR# 經 0.1 µF 電容接 RESET#，開序列埠產生負脈衝，Arduino 重置後進 bootloader。'],
+    ['要先報到','電腦要列舉並載入驅動，才會出現 COM 埠。']
+  ]);
+  fillItems('sumGrid',[
+    ['語言不同','USB 是封包，UART 是序列幀，CH340C 負責互相轉換。'],
+    ['方向相反流程也不同','往單晶片是拆封包逐字送；往電腦是緩衝後等 IN 取走。'],
+    ['鮑率','沒有時脈線，雙方必須事先約好，並在 Start 位元後各自取樣。'],
+    ['接線','TXD→RX、RXD→TX、GND 相連、電壓相符。'],
+    ['DTR# 自動重置','10 kΩ 上拉 5V 加 0.1 µF 電容，只放行變化，變成負脈衝讓 MCU 重置。'],
+    ['COM 埠','列舉加驅動模擬出的虛擬序列埠，編號可能會變。'],
+    ['CH340C','內建振盪器，不需外接石英，可用 3.3V 或 5V。']
+  ]);
+
+  /* ---------------- slide 2: stage ---------------- */
+  var STEPS = [
+    {t:'沒有翻譯官：各說各話',us:'<span class="en">Hello. Please tell me your device status.</span>',mid:'<span class="dim">（沒有人在中間）</span>',tw:'你…好…（一個字一個字慢慢說）',tech:'電腦送出的是 <b>USB 封包</b>，單晶片的 RX 腳只認得 <b>UART 序列幀</b>。直接接線，兩邊都聽不懂對方。',interp:false,l:'bad',r:'bad'},
+    {t:'請口譯員站進中間',us:'<span class="en">Hello, anyone there?</span>',mid:'我兩種語言都會。',tw:'好，我只需要聽中文。',tech:'CH340C 一側接電腦的 <b>UD+／UD−</b>（USB），另一側接單晶片的 <b>TXD／RXD</b>（UART）。',interp:true,l:'',r:''},
+    {t:'英文翻成中文（電腦 → 單晶片）',us:'<span class="en">Please turn on the LED.</span>',mid:'聽懂了，翻成：「請打開 LED」',tw:'收到：打開 LED。',tech:'USB 封包 → CH340C 取出資料 → 從 <b>TXD</b> 用 UART 一個位元組一個位元組送出。',interp:true,l:'on',r:'on'},
+    {t:'中文翻成英文（單晶片 → 電腦）',us:'<span class="en">Thank you.</span>',mid:'翻成：<span class="en">The LED is now on.</span>',tw:'LED 已經打開了。',tech:'UART 的字進入 <b>RXD</b> → CH340C 先暫存 → 打包成 USB 封包，等電腦來取。',interp:true,l:'on',r:'on'}
+  ];
+  var stI = 0, playT = null;
+  function renderStage(){
+    var s = STEPS[stI];
+    $('stTitle').textContent = s.t;
+    $('bUS').innerHTML = s.us; $('bMid').innerHTML = s.mid; $('bTW').innerHTML = s.tw;
+    $('stTech').innerHTML = s.tech;
+    $('stage').classList.toggle('has-interp', s.interp);
+    ['arL','arR'].forEach(function(id,k){
+      var st = k===0 ? s.l : s.r, a = $(id);
+      a.setAttribute('class','arrow'+(st==='on'?' on':st==='bad'?' bad':''));
+    });
+    $('stCount').textContent = (stI+1)+' / '+STEPS.length;
+    $('stPrev').disabled = stI===0;
+    $('stNext').disabled = stI===STEPS.length-1;
+  }
+  function stopPlay(){ if (playT){ clearInterval(playT); playT = null; } if ($('stPlay')) $('stPlay').textContent = '自動播放'; }
+  $('stPrev').addEventListener('click',function(){ stopPlay(); stI = Math.max(0,stI-1); renderStage(); });
+  $('stNext').addEventListener('click',function(){ stopPlay(); stI = Math.min(STEPS.length-1,stI+1); renderStage(); });
+  $('stPlay').addEventListener('click',function(){
+    if (playT){ stopPlay(); return; }
+    if (stI === STEPS.length-1) stI = 0;
+    renderStage();
+    $('stPlay').textContent = '暫停';
+    playT = setInterval(function(){
+      if (stI >= STEPS.length-1){ stopPlay(); return; }
+      stI++; renderStage();
+    },3200);
+  });
+  renderStage();
+
+  /* ---------------- slide 3: chip ---------------- */
+  var PINS = [
+    {id:'UD+',cls:'c-usb',x:126,y:98,w:64,t:'UD+',n:'UD+（USB D+）',d:'USB 差動訊號的 <b>D+</b>，接電腦 USB 的 D+。這一側講 USB 封包。'},
+    {id:'UD-',cls:'c-usb',x:126,y:158,w:64,t:'UD−',n:'UD−（USB D−）',d:'USB 差動訊號的 <b>D−</b>，接電腦 USB 的 D−。D+、D− 不能對調，否則電腦偵測不到裝置。'},
+    {id:'TXD',cls:'c-uart',x:370,y:80,w:64,t:'TXD',n:'TXD（UART 發送）',d:'晶片的「嘴巴」。電腦送來的資料翻成 UART 後從這裡出去，要接到<b>單晶片的 RX</b>。'},
+    {id:'RXD',cls:'c-uart',x:370,y:118,w:64,t:'RXD',n:'RXD（UART 接收）',d:'晶片的「耳朵」。單晶片說的話從這裡進來，要接到<b>單晶片的 TX</b>。'},
+    {id:'RTS',cls:'c-ctl',x:370,y:166,w:64,t:'RTS#',n:'RTS#（流控／控制腳）',d:'數據機時代留下的控制訊號之一，低電位有效（# 表示低態有效）。一般用 TXD、RXD、GND 就能通訊，這些腳可以不接。'},
+    {id:'DTR',cls:'c-ctl',x:370,y:204,w:64,t:'DTR#',n:'DTR#（控制腳）',d:'低電位有效的控制訊號。Arduino 常用它經電容送到重置腳，讓 IDE 上傳程式時自動重置板子。'},
+    {id:'VCC',cls:'c-pwr',x:226,y:14,w:56,t:'VCC',n:'VCC（電源）',d:'晶片的電源腳。電壓模式與 V3 腳的接法請照 WCH 資料表（5V 供電或 3.3V 供電的接法不同）。'},
+    {id:'V3',cls:'c-pwr',x:298,y:14,w:56,t:'V3',n:'V3（3.3V 相關腳）',d:'5V 供電時，<b>V3 只外接電容，不接 VCC</b>（WCH 資料表 5V 電氣參數的備註）。改用 3.3V 供電時的接法不同，請看資料表的 3.3V 章節，不要憑印象接。'},
+    {id:'GND',cls:'c-gnd',x:262,y:262,w:56,t:'GND',n:'GND（地）',d:'0V 參考點。要和單晶片的 GND 相連（共地），訊號才有同一個基準。'}
+  ];
+  (function(){
+    var svg = $('chipSvg'), h = '';
+    h += '<rect class="chip-body" x="190" y="40" width="180" height="222" rx="16"/>';
+    h += '<text class="chip-txt" x="280" y="136">CH340C</text><text class="chip-sub" x="280" y="160">內建振盪器</text><text class="chip-sub" x="280" y="180">不需外接石英</text>';
+    h += '<text class="side-lab" x="70" y="76" fill="var(--blue)">電腦（USB）側</text><text class="side-lab" x="492" y="60" fill="var(--accent)">單晶片（UART）側</text>';
+    PINS.forEach(function(p){
+      var cx = p.x+p.w/2, ph = 26;
+      h += '<g class="cp '+p.cls+'" data-p="'+p.id+'" role="button" tabindex="0" aria-label="'+p.n+'"><rect x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+ph+'" rx="7"/><text x="'+cx+'" y="'+(p.y+17)+'">'+p.t+'</text></g>';
+    });
+    svg.innerHTML = h;
+    function pick(g){
+      var id = g.getAttribute('data-p'), p = PINS.filter(function(x){ return x.id===id; })[0];
+      Array.prototype.forEach.call(svg.querySelectorAll('.cp'),function(x){ x.classList.toggle('active',x===g); });
+      $('chipInfo').innerHTML = '<b>'+p.n+'</b><br>'+p.d;
+    }
+    svg.addEventListener('click',function(e){ var g = e.target.closest('.cp'); if (g) pick(g); });
+    svg.addEventListener('keydown',function(e){ if (e.key==='Enter'||e.key===' '){ var g = e.target.closest('.cp'); if (g){ e.preventDefault(); pick(g); } } });
+  })();
+
+  /* ---------------- slide 4: PC -> MCU ---------------- */
+  var CHARS = [0x41,0x48,0x30,0x55,0x7E];
+  var curByte = 0x41;
+  function hex2(v){ return (v<16?'0':'')+v.toString(16).toUpperCase(); }
+  function charLabel(v){ return (v>=32 && v<127) ? String.fromCharCode(v) : '·'; }
+  var chars = $('chars');
+  CHARS.forEach(function(v){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.setAttribute('data-v',v);
+    b.innerHTML = charLabel(v)+'<small>0x'+hex2(v)+'</small>';
+    b.addEventListener('click',function(){ curByte = v; draw4(); });
+    chars.appendChild(b);
+  });
+  var PKT = [
+    {n:'SYNC',s:'同步',k:'k-sync',d:'封包開頭的同步位元，讓接收端對齊時脈。CH340C 的 USB 電路處理完就丟掉，不會出現在 UART 上。'},
+    {n:'PID',s:'DATA0',k:'k-pid',d:'封包識別碼，這裡表示「這是一個資料封包」。CH340C 看過就用不到了。'},
+    {n:'DATA',s:'',k:'k-field',d:'真正要送的資料位元組。這是唯一會被翻成 UART 的部分。'},
+    {n:'CRC16',s:'檢查碼',k:'k-crc',d:'資料的檢查碼。CH340C 重新計算並比對，不一致就當作壞封包，不會送給單晶片。'}
+  ];
+  var pktSel = 2;
+  function draw4(){
+    Array.prototype.forEach.call(chars.children,function(c){ c.classList.toggle('sel', parseInt(c.getAttribute('data-v'),10)===curByte); });
+    var row = $('usbPkt'); row.innerHTML = '';
+    PKT.forEach(function(p,i){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'pseg '+p.k+(i===pktSel?' sel':'');
+      b.innerHTML = '<span class="pn">'+(p.n==='DATA' ? '0x'+hex2(curByte) : p.n)+'</span><span class="ps">'+(p.n==='DATA'? p.n : p.s)+'</span>';
+      b.addEventListener('click',function(){ pktSel = i; draw4(); });
+      row.appendChild(b);
+    });
+    var p = PKT[pktSel];
+    $('pktDetail').innerHTML = '<span class="tag" style="--c:var(--accent)">'+p.n+'</span><br>'+p.d;
+    var f = uartFrame(curByte);
+    var levels = [1].concat(f).concat([1]);
+    var u = 40, x0 = 20, yHi = 36, yLo = 96;
+    var labels = ['閒置','Start','D0','D1','D2','D3','D4','D5','D6','D7','Stop','閒置'];
+    var svg = '';
+    for (var i=0;i<=12;i++){ svg += '<line class="bnd" x1="'+(x0+i*u)+'" y1="14" x2="'+(x0+i*u)+'" y2="108"/>'; }
+    var sl = parseInt($('bitSlider').value,10);
+    svg += '<rect x="'+(x0+sl*u)+'" y="14" width="'+u+'" height="94" rx="6" fill="var(--amber)" opacity=".28"/>';
+    svg += '<path d="'+sqPath(levels,u,yHi,yLo,x0)+'" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>';
+    labels.forEach(function(l,i){
+      svg += '<text class="ax" x="'+(x0+i*u+u/2)+'" y="126" text-anchor="middle">'+l+'</text>';
+      svg += '<text class="bitlab" x="'+(x0+i*u+u/2)+'" y="146">'+levels[i]+'</text>';
+    });
+    svg += '<text class="ax" x="2" y="'+(yHi+4)+'">1</text><text class="ax" x="2" y="'+(yLo+4)+'">0</text>';
+    $('uartSvg').innerHTML = svg;
+    var lab = labels[sl], bit = levels[sl], txt;
+    if (sl===0 || sl===11) txt = '<b>閒置</b>：線路維持高電位（1），等著有人開口。';
+    else if (sl===1) txt = '<b>Start 位元</b>：拉低到 0，喊一聲「我要開始講了」，接收端靠這個下降緣對時。';
+    else if (sl===10) txt = '<b>Stop 位元</b>：拉回高電位 1，表示這個字元說完了，之後回到閒置。';
+    else txt = '<b>'+lab+'</b> = '+bit+'。資料位元從最低位元 D0 先送；0x'+hex2(curByte)+' 二進位 '+('0000000'+curByte.toString(2)).slice(-8)+'，所以送出順序是 '+f.slice(1,9).join(' ')+'。';
+    $('uartNow').innerHTML = txt;
+    $('bitNow').textContent = lab;
+    $('uartPills').innerHTML = '<div>字元 '+charLabel(curByte)+'（0x'+hex2(curByte)+'）</div><div>送出順序 '+f.join(' ')+'</div><div>共 10 個位元時間</div><div>115200 bps ≈ 86.8 µs</div>';
+  }
+  $('bitSlider').addEventListener('input',draw4);
+  draw4();
+
+  /* ---------------- slide 5: MCU -> PC ---------------- */
+  var MSG = 'HELLO', mi = 0, buf = [], screenTxt = '', logs = [];
+  function addLog(cls,html){
+    logs.unshift([cls,html]); if (logs.length > 6) logs.pop();
+    $('pollLog').innerHTML = logs.map(function(l){ return '<div class="'+l[0]+'">'+l[1]+'</div>'; }).join('');
+  }
+  function draw5(){
+    $('bufRow').innerHTML = buf.length ? buf.map(function(c){ return '<div class="buf-cell">'+c+'<small>0x'+hex2(c.charCodeAt(0))+'</small></div>'; }).join('') : '<span class="buf-empty">（空的）</span>';
+    $('pcScreen').innerHTML = screenTxt ? screenTxt : '&nbsp;';
+    $('mcuHint').textContent = mi < MSG.length ? '下一個要說的字：「'+MSG[mi]+'」（共 '+MSG.length+' 個字：'+MSG+'）' : '單晶片已經把「'+MSG+'」說完了。';
+    $('mcuSend').disabled = mi >= MSG.length;
+  }
+  $('mcuSend').addEventListener('click',function(){
+    if (mi >= MSG.length) return;
+    var c = MSG[mi++]; buf.push(c);
+    addLog('', '單晶片從 TX 送出「<b>'+c+'</b>」，CH340C 收進緩衝區（此時電腦還不知道）。');
+    draw5();
+  });
+  $('pcPoll').addEventListener('click',function(){
+    if (!buf.length){ addLog('nak','電腦送出 <b>IN</b> 詢問 → CH340C 回 <b>NAK</b>：還沒有資料，稍後再問。這是正常現象，不是錯誤。'); return; }
+    var got = buf.join(''); screenTxt += got;
+    addLog('ok','電腦送出 <b>IN</b> 詢問 → CH340C 把緩衝區一次打包成 <b>DATA</b> 封包「'+got+'」（'+buf.length+' 個位元組），電腦回 <b>ACK</b>。');
+    buf = []; draw5();
+  });
+  $('pcReset').addEventListener('click',function(){ mi = 0; buf = []; screenTxt = ''; logs = []; $('pollLog').innerHTML = ''; draw5(); });
+  addLog('','試試看：先直接按「電腦詢問」，再讓單晶片說幾個字之後再問。');
+  draw5();
+
+  /* ---------------- slide 6: baud ---------------- */
+  var BAUDS = [9600,19200,57600,115200];
+  var bS = 115200, bR = 115200, off = 0;
+  function mkSeg(id,getv,setv){
+    var seg = $(id); seg.innerHTML = '';
+    BAUDS.forEach(function(v){
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = v;
+      b.addEventListener('click',function(){ setv(v); refreshSegs(); draw6(); });
+      seg.appendChild(b);
+    });
+  }
+  function refreshSegs(){
+    Array.prototype.forEach.call($('segS').children,function(b,i){ b.setAttribute('aria-pressed',BAUDS[i]===bS?'true':'false'); });
+    Array.prototype.forEach.call($('segR').children,function(b,i){ b.setAttribute('aria-pressed',BAUDS[i]===bR?'true':'false'); });
+  }
+  mkSeg('segS',null,function(v){ bS = v; });
+  mkSeg('segR',null,function(v){ bR = v; });
+  function draw6(){
+    var rxActual = bR*(1+off/100), out = '', bad = 0;
+    'Hello'.split('').forEach(function(ch){
+      var r = decodeByte(ch.charCodeAt(0),bS,rxActual);
+      if (r.value === ch.charCodeAt(0) && !r.framing){ out += ch; }
+      else { bad++; out += '?'; }
+    });
+    var el = $('rxText'); el.textContent = out; el.className = 'res-big mono '+(bad?'bad':'good');
+    $('offLab').textContent = (off>0?'+':'')+off+'%';
+    var ratio = ((rxActual/bS-1)*100);
+    $('baudNote').innerHTML = bad
+      ? '<b>亂碼了。</b>送出端每個位元 '+(1e6/bS).toFixed(1)+' µs，接收端每個位元 '+(1e6/rxActual).toFixed(1)+' µs，差 '+ratio.toFixed(1)+'%。取樣點滑到別的位元上（也可能 Stop 位元對不上，出現 framing error）。'
+      : '<b>解讀正確。</b>送出端每個位元 '+(1e6/bS).toFixed(1)+' µs，接收端 '+(1e6/rxActual).toFixed(1)+' µs，誤差 '+ratio.toFixed(1)+'%，還在接收端容忍的範圍內。';
+  }
+  $('offSlider').addEventListener('input',function(){ off = parseInt(this.value,10); draw6(); });
+  refreshSegs(); draw6();
+
+  /* ---------------- slide 7: wiring ---------------- */
+  var LP = [['TXD',70],['RXD',130],['GND',190]], RP = [['TX',70],['RX',130],['GND',190]];
+  var wires = [], selPin = null, vc = 5, vm = 5;
+  var wsvg = $('wireSvg');
+  function pinY(side,id){ var arr = side==='L'?LP:RP; for (var i=0;i<arr.length;i++){ if (arr[i][0]===id) return arr[i][1]; } return 0; }
+  function wireColor(l,r){ return (l==='GND'&&r==='GND') ? 'var(--wire-black)' : (l==='TXD'&&r==='RX')||(l==='RXD'&&r==='TX') ? 'var(--accent)' : 'var(--coral)'; }
+  function drawWire(){
+    var h = '';
+    h += '<rect class="box-rect" x="30" y="30" width="140" height="190" rx="14"/><text class="box-title" x="100" y="22">CH340C 模組</text>';
+    h += '<rect class="box-rect" x="390" y="30" width="140" height="190" rx="14"/><text class="box-title" x="460" y="22">單晶片（MCU）</text>';
+    wires.forEach(function(w){
+      var y1 = pinY('L',w[0]), y2 = pinY('R',w[1]);
+      h += '<path class="wire" d="M170 '+y1+' C 260 '+y1+' 300 '+y2+' 390 '+y2+'" stroke="'+wireColor(w[0],w[1])+'"/>';
+    });
+    function usedL(id){ return wires.some(function(w){ return w[0]===id; }); }
+    function usedR(id){ return wires.some(function(w){ return w[1]===id; }); }
+    LP.forEach(function(p){
+      var cls = 'wpin'+(selPin && selPin[0]==='L' && selPin[1]===p[0] ? ' sel':'')+(usedL(p[0])?' used':'');
+      h += '<text class="wlab r" x="46" y="'+(p[1]+5)+'">'+p[0]+'</text>';
+      h += '<g class="'+cls+'" data-s="L" data-id="'+p[0]+'" role="button" tabindex="0" aria-label="CH340C '+p[0]+'"><circle cx="170" cy="'+p[1]+'" r="11"/></g>';
+    });
+    RP.forEach(function(p){
+      var cls = 'wpin'+(selPin && selPin[0]==='R' && selPin[1]===p[0] ? ' sel':'')+(usedR(p[0])?' used':'');
+      h += '<text class="wlab l" x="514" y="'+(p[1]+5)+'">'+p[0]+'</text>';
+      h += '<g class="'+cls+'" data-s="R" data-id="'+p[0]+'" role="button" tabindex="0" aria-label="單晶片 '+p[0]+'"><circle cx="390" cy="'+p[1]+'" r="11"/></g>';
+    });
+    wsvg.innerHTML = h;
+  }
+  function clickPin(side,id){
+    // 點到已接的腳：拆線
+    var idx = -1;
+    wires.forEach(function(w,i){ if ((side==='L'&&w[0]===id)||(side==='R'&&w[1]===id)) idx = i; });
+    if (idx >= 0 && !selPin){ wires.splice(idx,1); draw7(); return; }
+    if (!selPin){ selPin = [side,id]; draw7(); return; }
+    if (selPin[0] === side){ selPin = [side,id]; draw7(); return; }
+    var l = side==='L' ? id : selPin[1], r = side==='R' ? id : selPin[1];
+    wires = wires.filter(function(w){ return w[0]!==l && w[1]!==r; });
+    wires.push([l,r]); selPin = null; draw7();
+  }
+  wsvg.addEventListener('click',function(e){ var g = e.target.closest('.wpin'); if (g) clickPin(g.getAttribute('data-s'),g.getAttribute('data-id')); });
+  wsvg.addEventListener('keydown',function(e){ if (e.key==='Enter'||e.key===' '){ var g = e.target.closest('.wpin'); if (g){ e.preventDefault(); clickPin(g.getAttribute('data-s'),g.getAttribute('data-id')); } } });
+  var PRESETS = [
+    ['正確接法',[['TXD','RX'],['RXD','TX'],['GND','GND']]],
+    ['TX 接 TX',[['TXD','TX'],['RXD','RX'],['GND','GND']]],
+    ['忘了共地',[['TXD','RX'],['RXD','TX']]],
+    ['清除',[]]
+  ];
+  PRESETS.forEach(function(p){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'cta small secondary'; b.textContent = p[0];
+    b.addEventListener('click',function(){ wires = p[1].map(function(x){ return x.slice(); }); selPin = null; draw7(); });
+    $('presets').appendChild(b);
+  });
+  function mkVSeg(id,get,set){
+    var seg = $(id); seg.innerHTML = '';
+    [3.3,5].forEach(function(v){
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = v+'V';
+      b.addEventListener('click',function(){ set(v); draw7(); });
+      seg.appendChild(b);
+    });
+  }
+  mkVSeg('segVc'); mkVSeg('segVm');
+  function row(cls,badge,txt){ return '<div class="vrow"><span class="badge '+cls+'">'+badge+'</span><span>'+txt+'</span></div>'; }
+  function draw7(){
+    drawWire();
+    mkVSeg('segVc',null,function(v){ vc = v; });
+    mkVSeg('segVm',null,function(v){ vm = v; });
+    Array.prototype.forEach.call($('segVc').children,function(b,i){ b.setAttribute('aria-pressed',([3.3,5][i]===vc)?'true':'false'); });
+    Array.prototype.forEach.call($('segVm').children,function(b,i){ b.setAttribute('aria-pressed',([3.3,5][i]===vm)?'true':'false'); });
+    var r = wireVerdict(wires,vc,vm);
+    var h = '';
+    h += row(r.p2m?'ok':'no', r.p2m?'通':'不通','<b>電腦 → 單晶片：</b>'+r.p2mWhy);
+    h += row(r.m2p?'ok':'no', r.m2p?'通':'不通','<b>單晶片 → 電腦：</b>'+r.m2pWhy);
+    h += row(r.gnd?'ok':'warn', r.gnd?'共地':'沒共地','<b>地線：</b>'+r.gndWhy);
+    h += row(r.volt==='ok'?'ok':r.volt==='bad'?'no':'warn', r.volt==='ok'?'相符':r.volt==='bad'?'危險':'注意','<b>電壓：</b>'+r.voltWhy);
+    var out;
+    if (r.allOk) out = '電腦在終端機輸入的 <b>A</b>（0x41）會從 TXD 送到單晶片的 RX，單晶片的回覆也能回到電腦。';
+    else if (r.p2m && !r.gnd) out = '單晶片可能偶爾收到 A，更多時候是亂碼，因為沒有共同的 0V 參考點。';
+    else if (!r.p2m && !r.m2p) out = '兩個方向都不通，單晶片什麼也收不到。';
+    else out = '只有一個方向通，另一個方向的資料送不到。';
+    h += '<div class="now-strip"><b>結果：</b>'+out+'</div>';
+    $('verdict').innerHTML = h;
+  }
+  wires = [['TXD','TX'],['RXD','RX'],['GND','GND']];
+  draw7();
+
+  /* ---------------- slide 7: TTL levels ---------------- */
+  var TTSETS = [
+    {name:'標準 TTL（Vcc = 5V）',VOH:2.4,VOL:0.5,VIH:2.0,VIL:0.8,note:'標準 TTL 的數值。'},
+    {name:'CH340C（5V 供電）',VOH:4.4,VOL:0.5,VIH:2.3,VIL:0.9,note:'WCH 資料表 6.2「5V 電氣參數」（TA = 25℃、VCC = 5V，不含連接 USB 匯流排的腳位）：VIL 0 ~ 0.9V、VIH 2.3V ~ VCC、VOL 最大 0.5V（吸入 6 mA）、VOH 最小 VCC − 0.6V = 4.4V（輸出 2 mA；晶片重置期間僅 100 µA）。'}
+  ];
+  var ttSel = 0, TT = TTSETS[0];
+  function ttlY(v){ return 204 - v*36; }
+  function fv(x){ return (Math.round(x*10)/10).toFixed(1); }
+  function drawTtl(){
+    TT = TTSETS[ttSel];
+    var v = parseFloat($('ttlSlider').value);
+    var s = '';
+    for (var g=0; g<=5; g++){ s += '<line class="grid-l" x1="44" y1="'+ttlY(g)+'" x2="540" y2="'+ttlY(g)+'"/><text class="ax" x="38" y="'+(ttlY(g)+4)+'" text-anchor="end">'+g+'V</text>'; }
+    function bar(x,w,zones,title){
+      var o = '<text class="ttl" x="'+(x+w/2)+'" y="14" text-anchor="middle">'+title+'</text>';
+      zones.forEach(function(z){ o += '<rect x="'+x+'" y="'+ttlY(z[1])+'" width="'+w+'" height="'+(ttlY(z[0])-ttlY(z[1]))+'" fill="'+z[2]+'" opacity="'+z[3]+'"/>'; });
+      return o;
+    }
+    s += bar(90,120,[[0,TT.VOL,'var(--blue)',0.5],[TT.VOL,TT.VOH,'var(--amber)',0.18],[TT.VOH,5,'var(--accent)',0.5]],'輸出端（驅動方）');
+    s += bar(290,120,[[0,TT.VIL,'var(--blue)',0.5],[TT.VIL,TT.VIH,'var(--amber)',0.25],[TT.VIH,5,'var(--accent)',0.5]],'輸入端（接收方）');
+    s += '<text class="ax" x="150" y="'+(ttlY(0.25)+4)+'" text-anchor="middle">VOL ≤ '+fv(TT.VOL)+'V</text><text class="ax" x="150" y="'+(ttlY((TT.VOH+5)/2)+4)+'" text-anchor="middle">VOH ≥ '+fv(TT.VOH)+'V</text><text class="ax" x="150" y="'+(ttlY((TT.VOL+TT.VOH)/2)+4)+'" text-anchor="middle">輸出不保證</text>';
+    s += '<text class="ax" x="350" y="'+(ttlY(TT.VIL/2)+4)+'" text-anchor="middle">VIL ≤ '+fv(TT.VIL)+'V 判為 0</text><text class="ax" x="350" y="'+(ttlY((TT.VIH+5)/2)+4)+'" text-anchor="middle">VIH ≥ '+fv(TT.VIH)+'V 判為 1</text><text class="ax" x="350" y="'+(ttlY((TT.VIL+TT.VIH)/2)+4)+'" text-anchor="middle">不確定</text>';
+    s += '<text class="ax" x="428" y="'+(ttlY((TT.VOL+TT.VIL)/2)+4)+'">低態雜訊容限 '+fv(TT.VIL-TT.VOL)+'V</text><text class="ax" x="428" y="'+(ttlY((TT.VOH+TT.VIH)/2)+4)+'">高態雜訊容限 '+fv(TT.VOH-TT.VIH)+'V</text>';
+    s += '<line x1="44" y1="'+ttlY(TT.VIL)+'" x2="540" y2="'+ttlY(TT.VIL)+'" stroke="var(--ink)" stroke-width="1.8"/><text class="ax" x="48" y="'+(ttlY(TT.VIL)-4)+'" style="font-weight:700;fill:var(--ink)">'+fv(TT.VIL)+'V</text>';
+    s += '<line x1="44" y1="'+ttlY(TT.VIH)+'" x2="540" y2="'+ttlY(TT.VIH)+'" stroke="var(--ink)" stroke-width="1.8" stroke-dasharray="7 5"/><text class="ax" x="48" y="'+(ttlY(TT.VIH)-4)+'" style="font-weight:700;fill:var(--ink)">'+fv(TT.VIH)+'V</text>';
+    s += '<line x1="44" y1="'+ttlY(v)+'" x2="540" y2="'+ttlY(v)+'" stroke="var(--coral)" stroke-width="2.5"/><circle cx="540" cy="'+ttlY(v)+'" r="5" fill="var(--coral)"/>';
+    $('ttlSvg').innerHTML = s;
+    $('ttlV').textContent = v.toFixed(1)+'V';
+    Array.prototype.forEach.call($('segTT').children,function(b,i){ b.setAttribute('aria-pressed',i===ttSel?'true':'false'); });
+    var rx = v <= TT.VIL ? ['ok','判為 0（低）'] : v >= TT.VIH ? ['ok','判為 1（高）'] : ['no','不確定'];
+    var tx = v <= TT.VOL ? ['ok','合格的低電位輸出'] : v >= TT.VOH ? ['ok','合格的高電位輸出'] : ['warn','不在保證範圍'];
+    $('ttlRead').innerHTML = '<div class="vrow"><span class="badge '+rx[0]+'">接收方</span><span>線上 '+v.toFixed(1)+'V：'+rx[1]+(v>=TT.VIH?'（比 VIH 高 '+(v-TT.VIH).toFixed(1)+'V）':v<=TT.VIL?'（比 VIL 低 '+(TT.VIL-v).toFixed(1)+'V）':'，'+fv(TT.VIL)+'V 到 '+fv(TT.VIH)+'V 之間，輸入可能被讀成 0 或 1')+'。</span></div><div class="vrow"><span class="badge '+tx[0]+'">驅動方</span><span>'+tx[1]+'。'+TT.name+' 輸出保證 ≤ '+fv(TT.VOL)+'V 或 ≥ '+fv(TT.VOH)+'V。</span></div>';
+    $('ttlNote').textContent = TT.note;
+  }
+  TTSETS.forEach(function(t,i){
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = t.name;
+    b.addEventListener('click',function(){ ttSel = i; drawTtl(); });
+    $('segTT').appendChild(b);
+  });
+  $('ttlSlider').addEventListener('input',drawTtl);
+  [['ttl0',0],['ttl33',3.3],['ttl5',5]].forEach(function(a){ $(a[0]).addEventListener('click',function(){ $('ttlSlider').value = a[1]; drawTtl(); }); });
+  drawTtl();
+
+  /* ---------------- slide 8: auto reset ---------------- */
+  var RS = [
+    ['閒置',5,5,'序列埠還沒開：DTR# 是高電位，電容兩端都在 5V，RESET# 被 10 kΩ 上拉維持高電位，MCU 正常執行程式。'],
+    ['開啟序列埠',0,5,'電腦端的 IDE 開啟序列埠，驅動把 DTR# 拉到低電位。電容兩端的電壓差不能瞬間改變，所以 RESET# 這一端也跟著被「拉」下去。'],
+    ['負脈衝',0,0,'RESET# 掉到接近 0V，MCU 偵測到低電位，開始重置。同時上拉電阻透過 5V 慢慢替電容充電。'],
+    ['恢復高電位',0,5,'電容充飽後，不再傳遞電流，RESET# 回到 5V，MCU 重新啟動並進入 bootloader；DTR# 雖然仍是低電位，電容擋住直流，所以不會一直重置。']
+  ];
+  var rsI = 0;
+  var rsPills = $('rsPills');
+  var RSC = ['var(--blue)','var(--amber)','var(--coral)','var(--accent)'];
+  RS.forEach(function(r,i){ var s = document.createElement('span'); s.className = 'state-pill rsp'; s.style.setProperty('--c',RSC[i]); s.textContent = r[0]; rsPills.appendChild(s); });
+  function drawRstCircuit(){
+    var st = RS[rsI], dc = st[1] ? 'var(--accent)' : 'var(--coral)', rc = st[2] ? 'var(--accent)' : 'var(--coral)';
+    var h = '';
+    h += '<rect class="box-rect" x="14" y="70" width="108" height="64" rx="10"/><text class="box-title" x="68" y="98">CH340C</text><text class="ax" x="68" y="120" text-anchor="middle">DTR# 腳</text>';
+    h += '<rect class="box-rect" x="418" y="50" width="130" height="104" rx="10"/><text class="box-title" x="483" y="82">ATmega328P</text><text class="ax" x="483" y="104" text-anchor="middle">PC6（第 1 腳）</text><text class="ax" x="483" y="122" text-anchor="middle">= RESET#</text>';
+    h += '<path d="M122 102H196" stroke="'+dc+'" stroke-width="4" stroke-linecap="round" fill="none"/>';
+    h += '<path d="M212 102H300H418" stroke="'+rc+'" stroke-width="4" stroke-linecap="round" fill="none"/>';
+    h += '<path d="M196 82V122M212 82V122" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>';
+    h += '<text class="wlab" x="204" y="150" text-anchor="middle" style="text-anchor:middle">0.1 µF</text>';
+    h += '<path d="M300 102V70" stroke="'+rc+'" stroke-width="4" stroke-linecap="round" fill="none"/>';
+    h += '<rect x="290" y="38" width="20" height="32" rx="3" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.5"/>';
+    h += '<text class="wlab" x="322" y="58">10 kΩ</text>';
+    h += '<path d="M300 38V16" stroke="var(--wire-red)" stroke-width="4" stroke-linecap="round" fill="none"/>';
+    h += '<text class="wlab" x="300" y="12" style="text-anchor:middle">5V</text>';
+    h += '<circle cx="300" cy="102" r="5" fill="'+rc+'"/>';
+    h += '<text class="bitlab" x="160" y="92" style="text-anchor:middle;fill:'+dc+'">'+(st[1]?'5V':'0V')+'</text>';
+    h += '<text class="bitlab" x="360" y="92" style="text-anchor:middle;fill:'+rc+'">'+(st[2]?'5V':'0V')+'</text>';
+    $('rstSvg').innerHTML = h;
+    Array.prototype.forEach.call(rsPills.children,function(p,i){ p.className = 'state-pill rsp'+(i<rsI?' done':i===rsI?' now':''); });
+    $('rsNote').innerHTML = '<b>'+st[0]+'：</b>'+st[3];
+    $('rsNote').style.borderLeft = '6px solid '+RSC[rsI];
+    if (typeof drawPlot === 'function' && typeof CVALS !== 'undefined') drawPlot();
+    $('rsPrev').disabled = rsI===0; $('rsNext').disabled = rsI===RS.length-1;
+  }
+  $('rsPrev').addEventListener('click',function(){ rsI = Math.max(0,rsI-1); drawRstCircuit(); });
+  $('rsNext').addEventListener('click',function(){ rsI = Math.min(RS.length-1,rsI+1); drawRstCircuit(); });
+  var CVALS = [0.001,0.01,0.1,0.47], RVALS = [4.7,10,47], cI = 2, rI = 1, TRST = 2.5e-6;
+  function drawPlot(){
+    var C = CVALS[cI]*1e-6, R = RVALS[rI]*1e3, tau = R*C;
+    var T = 0.006, t0 = 0.0006, tmax = T - t0;
+    var VTH = 0.2*5;
+    var X0 = 44, X1 = 504, Y5 = 24, Y0 = 164;
+    function px(t){ return X0 + (t/T)*(X1-X0); }
+    function py(v){ return Y0 - (v/5)*(Y0-Y5); }
+    var dtr = 'M'+px(0)+' '+py(5)+' L'+px(t0)+' '+py(5)+' L'+px(t0)+' '+py(0)+' L'+px(T)+' '+py(0);
+    var rst = 'M'+px(0)+' '+py(5)+' L'+px(t0)+' '+py(5)+' L'+px(t0)+' '+py(0), n = 300, vend = 0;
+    for (var i=1;i<=n;i++){ var tt = tmax*i/n; vend = 5*(1-Math.exp(-tt/tau)); rst += ' L'+px(t0+tt).toFixed(1)+' '+py(vend).toFixed(1); }
+    var below = tau*Math.log(5/(5-VTH)), tb = Math.min(below,tmax);
+    var s = '';
+    s += '<line class="grid-l" x1="'+X0+'" y1="'+py(5)+'" x2="'+X1+'" y2="'+py(5)+'"/><line class="grid-l" x1="'+X0+'" y1="'+py(0)+'" x2="'+X1+'" y2="'+py(0)+'"/>';
+    for (var k=0;k<=6;k++){ s += '<line class="grid-l" x1="'+px(k/1000)+'" y1="'+py(0)+'" x2="'+px(k/1000)+'" y2="'+(py(0)+5)+'"/><text class="ax" x="'+px(k/1000)+'" y="'+(py(0)+18)+'" text-anchor="middle">'+k+'</text>'; }
+    s += '<rect x="'+px(t0)+'" y="'+py(VTH)+'" width="'+Math.max(2,px(t0+tb)-px(t0))+'" height="'+(py(0)-py(VTH))+'" fill="var(--coral)" opacity=".3"/>';
+    s += '<line class="thr" x1="'+X0+'" y1="'+py(VTH)+'" x2="'+X1+'" y2="'+py(VTH)+'"/>';
+    s += '<text class="ax" x="'+(X0-6)+'" y="'+(py(5)+4)+'" text-anchor="end">5V</text><text class="ax" x="'+(X0-6)+'" y="'+(py(0)+4)+'" text-anchor="end">0V</text>';
+    s += '<text class="ax" x="'+X1+'" y="'+(py(VTH)-4)+'" text-anchor="end" fill="var(--coral)">0.2 VCC = 1.0V 以下：視為低電位</text>';
+    var NAMES = ['① 閒置','② 開啟序列埠','③ 負脈衝','④ 恢復高電位'];
+    var tbw = Math.min(below,tmax);
+    var BANDS = [[0,t0],[t0-0.00018,t0+0.00018],[t0,t0+tbw],[t0+tbw,T]];
+    var bd = BANDS[rsI], bx = px(Math.max(0,bd[0])), bw = Math.max(3,px(bd[1])-px(Math.max(0,bd[0])));
+    s += '<rect x="'+bx+'" y="'+Y5+'" width="'+bw+'" height="'+(Y0-Y5)+'" fill="'+RSC[rsI]+'" opacity=".22" stroke="'+RSC[rsI]+'" stroke-width="1.5"/>';
+    s += '<text class="ttl" x="'+(rsI===1?bx+bw/2:bx+4)+'" y="16" text-anchor="'+(rsI===1?'middle':'start')+'" style="fill:var(--ink)">'+NAMES[rsI]+'</text>';
+    s += '<path d="'+dtr+'" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>';
+    s += '<path d="'+rst+'" fill="none" stroke="var(--coral)" stroke-width="2.5" stroke-linejoin="round"/>';
+    s += '<text class="ax" x="'+X1+'" y="198" text-anchor="end">時間軸固定：0 ~ 6 ms（橫軸單位 ms）；紅色陰影＝低於 1.0V（0.2 VCC）的時間</text>';
+    function fmt(t){ var ms = t*1000; return ms<0.1 ? (ms*1000).toFixed(0)+' µs' : (ms>=10? ms.toFixed(0): ms.toFixed(2))+' ms'; }
+    $('rstPlot').innerHTML = s;
+    var tLow = tau*Math.log(5/(5-VTH));
+    $('rstCalc').innerHTML = '時間常數 <b>τ = R × C = '+fmt(tau)+'</b>。DTR# 拉低後，RESET# 從 5V 掉到 0V，再回升到 1.0V（0.2 VCC）所需時間約 <b>τ × ln(5/4) ≈ '+fmt(tLow)+'</b>，這段時間內視為低電位。';
+    var ratio = tLow/TRST, okc = tLow > TRST;
+    $('rstCmp').innerHTML = '<div class="vrow"><span class="badge '+(okc?'ok':'no')+'">'+(okc?'比 tRST 長':'比 tRST 短')+'</span><span>低準位時間 <b>'+fmt(tLow)+'</b>，tRST（最短脈衝寬度）<b>2.5 µs</b>，約為 tRST 的 <b>'+(ratio>=10?ratio.toFixed(0):ratio.toFixed(2))+' 倍</b>。'+(okc?'低準位持續的時間超過 tRST，能保證 MCU 產生重置。':'低準位時間不到 tRST，MCU 不保證會被重置，自動燒錄可能失敗。')+'</span></div>';
+  }
+  function mkPSeg(id,vals,unit,get,set){
+    var seg = $(id); seg.innerHTML = '';
+    vals.forEach(function(v,i){
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = v+unit;
+      b.setAttribute('aria-pressed', i===get()?'true':'false');
+      b.addEventListener('click',function(){ set(i); Array.prototype.forEach.call(seg.children,function(x,k){ x.setAttribute('aria-pressed',k===i?'true':'false'); }); drawPlot(); });
+      seg.appendChild(b);
+    });
+  }
+  mkPSeg('segC',CVALS,' µF',function(){ return cI; },function(i){ cI = i; });
+  mkPSeg('segRp',RVALS,' kΩ',function(){ return rI; },function(i){ rI = i; });
+  drawRstCircuit(); drawPlot();
+
+  /* ---------------- slide 9: registration ---------------- */
+  var REG = [
+    ['插上 USB','CH340C 的 UD+ 與 UD− 接上電腦的 USB 孔，電腦偵測到有新裝置接入並供電（空閒時 USB 裝置最多吃約 100 mA）。這時它還只是「某個不知名的裝置」。'],
+    ['列舉','電腦重設匯流排後問它：「你是誰？」，CH340C 回報裝置描述，其中有 <b>VID:PID</b>（常見是 1A86:7523），電腦同時指派一個 USB 位址給它。'],
+    ['載入驅動','電腦依 VID:PID 找到對應的驅動程式。CH340 使用廠商自訂的通訊方式，不是通用的標準序列類別，所以需要它專屬的驅動（Windows 的 CH341SER，較新的 Windows 常會自動安裝；Linux 內建 ch341 驅動）。'],
+    ['COM 埠出現','驅動建立一個虛擬序列埠：Windows 上是 COM3、COM7 這類名稱，Linux 上常見 /dev/ttyUSB0。Arduino IDE 與終端機軟體就是開這個埠。'],
+    ['設定鮑率','應用程式把 115200、8N1 之類的設定交給驅動，驅動再用 USB 控制請求告訴 CH340C。之後 CH340C 的 UART 側就用這個速度收發。USB 那一側的速度不受影響。']
+  ];
+  var rgI = 0;
+  var rgPills = $('rgPills');
+  REG.forEach(function(r,i){
+    var s = document.createElement('span'); s.className = 'state-pill'; s.textContent = r[0];
+    rgPills.appendChild(s);
+  });
+  function drawRgScene(st){
+    var s = '';
+    function T(x,y,txt,cls,anchor){ return '<text class="rg-t '+(cls||'')+'" x="'+x+'" y="'+y+'" text-anchor="'+(anchor||'middle')+'">'+txt+'</text>'; }
+    // 電腦
+    s += T(105,14,'電腦（USB 主機）','b');
+    s += '<rect class="box-rect" x="10" y="22" width="190" height="178" rx="12"/>';
+    s += '<rect x="22" y="36" width="166" height="40" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>'+T(st>=3?140:105,60,st>=3?'IDE／終端機':'應用程式（IDE／終端機）','');
+    s += '<rect x="22" y="90" width="166" height="40" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>'+(st<2?T(105,114,'作業系統（還沒有驅動）','s'):'');
+    s += '<rect x="22" y="144" width="166" height="40" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>'+T(105,168,'USB 主控制器','');
+    // 纜線與裝置
+    s += '<path d="M188 164H340" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>'+T(264,184,'USB（D+／D−）','s');
+    s += '<g class="'+(st===0?'rg-plug':'')+'"><rect x="338" y="154" width="22" height="20" rx="3" fill="var(--ink)"/></g>';
+    s += '<rect x="360" y="110" width="100" height="100" rx="12" fill="'+(st>=1?'var(--amber-soft)':'var(--surface)')+'" stroke="var(--amber-strong)" stroke-width="2.5"/>';
+    if (st===0){ s += '<rect class="rg-glow" style="animation-delay:1s" x="360" y="110" width="100" height="100" rx="12" fill="var(--amber-soft)" stroke="var(--amber-strong)" stroke-width="2.5"/>'; }
+    s += T(410,142,'CH340C','b');
+    s += T(410,160,st>=1?'已上電':'未上電','s');
+    s += '<path d="M460 164H540" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>'+T(500,152,'UART','s')+T(500,184,'TXD／RXD','s')+T(500,198,'→ 單晶片','s');
+    if (st>=1){ s += T(410,180,st>=2?'1A86:7523':'位址 N','m'); s += T(410,196,st>=2?'位址 N':'','s'); }
+    if (st===0){
+      s += '<g class="rg-glow" style="animation-delay:1s">'+T(410,180,'供電 5V','b')+T(410,196,'空閒約 100 mA 內','s')+'</g>';
+      [0,0.4,0.8].forEach(function(d){ s += '<circle class="rg-pulse" style="animation-delay:'+(1+d)+'s" cx="190" cy="164" r="5" fill="var(--wire-red)"/>'; });
+    }
+    if (st===1){
+      var B = [[28,'→ GET_DESCRIPTOR','你是誰？','var(--blue)',0],[70,'← 回報身分','VID:PID 1A86:7523','var(--amber-strong)',1.3],[112,'→ SET_ADDRESS','你的位址是 N','var(--blue)',2.6]];
+      B.forEach(function(b){
+        s += '<g class="rg-in" style="animation-delay:'+b[4]+'s"><rect x="204" y="'+b[0]+'" width="148" height="36" rx="9" fill="var(--surface)" stroke="'+b[3]+'" stroke-width="2"/>'+T(278,b[0]+15,b[1],'b')+T(278,b[0]+29,b[2],'s')+'</g>';
+      });
+    }
+    if (st>=2){
+      s += '<g class="'+(st===2?'rg-in':'')+'"><rect x="34" y="98" width="142" height="24" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>'+T(105,114,'驅動 CH341SER','b')+'</g>';
+      if (st===2){
+        s += '<g class="rg-in" style="animation-delay:.7s">'+T(105,142,'✓ VID:PID 相符，載入驅動','s')+'</g>';
+        s += '<path class="rg-in" style="animation-delay:.4s" d="M360 190 C 300 205 240 140 176 112" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4"/>';
+      }
+    }
+    if (st>=3){
+      s += '<g class="'+(st===3?'rg-pop':'')+'"><rect x="30" y="44" width="62" height="24" rx="12" fill="var(--accent)"/>'+'<text class="rg-t b" x="61" y="60" text-anchor="middle" style="fill:var(--accent-ink)">COM3</text></g>';
+      s += '<path d="M61 68V98" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>';
+      if (st===3){ s += '<g class="rg-in" style="animation-delay:.6s">'+T(105,142,'Linux 為 /dev/ttyUSB0','s')+'</g>'; }
+    }
+    if (st===4){
+      s += '<g class="rg-down" style="animation-delay:.2s"><rect x="60" y="62" width="90" height="20" rx="10" fill="var(--amber)"/>'+T(105,76,'115200 8N1','m')+'</g>';
+      s += '<g class="rg-fly" style="animation-delay:1.4s"><rect x="190" y="152" width="80" height="20" rx="10" fill="var(--amber)"/>'+T(230,166,'115200 8N1','m')+'</g>';
+      s += '<g class="rg-glow" style="animation-delay:2.7s">'+T(500,130,'UART 改為','s')+T(500,143,'115200 bps','m')+'</g>';
+      [0,0.33,0.66].forEach(function(d){ s += '<rect class="rg-bits" style="animation-delay:'+(3+d)+'s" x="462" y="158" width="12" height="12" rx="3" fill="var(--accent)"/>'; });
+    }
+    $('rgSvg').innerHTML = s;
+  }
+  function drawReg(){
+    Array.prototype.forEach.call(rgPills.children,function(p,i){ p.className = 'state-pill'+(i<rgI?' done':i===rgI?' now':''); });
+    $('rgTitle').textContent = REG[rgI][0];
+    drawRgScene(rgI);
+    $('rgBody').innerHTML = REG[rgI][1];
+    $('rgCount').textContent = (rgI+1)+' / '+REG.length;
+    $('rgPrev').disabled = rgI===0; $('rgNext').disabled = rgI===REG.length-1;
+  }
+  $('rgPrev').addEventListener('click',function(){ rgI = Math.max(0,rgI-1); drawReg(); });
+  $('rgNext').addEventListener('click',function(){ rgI = Math.min(REG.length-1,rgI+1); drawReg(); });
+  $('rgReplay').addEventListener('click',function(){ drawRgScene(rgI); });
+  drawReg();
+
+  /* ---------------- slide 9: myths ---------------- */
+  var MYTHS = [
+    ['CH340C 只是一條把訊號接過去的線。','它是有腦袋的晶片：自己完成 USB 列舉、封包收發與檢查，再翻成 UART。'],
+    ['TX 接 TX、RX 接 RX 才是「對應」。','要交叉：TXD 接對方的 RX，RXD 接對方的 TX，還要共地。'],
+    ['鮑率隨便設，反正資料會到。','沒有時脈線，兩邊鮑率必須一致，誤差只能在幾 % 以內，否則亂碼。']
+  ];
+  var mg = $('mythGrid');
+  MYTHS.forEach(function(m,i){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'flip-card myth'; b.setAttribute('aria-label','誤解 '+(i+1)+'，點一下翻面');
+    b.innerHTML = '<div class="flip-inner"><div class="flip-face flip-front"><span class="tagline">誤解 '+(i+1)+' ✗</span><span class="stmt">'+m[0]+'</span></div><div class="flip-face flip-back"><span class="tagline">正確說法 ✓</span><span class="why" style="font-size:14px;font-weight:700">'+m[1]+'</span></div></div>';
+    b.addEventListener('click',function(){ b.classList.toggle('flipped'); });
+    mg.appendChild(b);
+  });
+
+  /* ---------------- common mistakes ---------------- */
+  var MISTAKES = {
+    8:[
+      ['DTR# 直接接到 RESET# 就好。','直接連線後，序列埠一開 DTR# 就一直是低電位，MCU 被持續重置，程式根本跑不起來。','要串一顆電容：電容只放行電壓的「變化」，產生短短的負脈衝，之後 RESET# 回到高電位。'],
+      ['RESET# 不用上拉，懸空也行。','腳位懸空，雜訊讓板子隨機重啟。','用 10 kΩ 上拉到 5V，平時穩穩維持高電位。'],
+      ['開序列埠不會影響 MCU。','在 Arduino IDE 開 Serial Monitor，板子重啟，計數變數歸零、setup() 再跑一次。','這是 DTR# 自動重置的正常現象，也是上傳不用按重置鈕的原因。']
+    ],
+    2:[
+      ['CH340C 只是把訊號放大的轉接頭。','把 USB 線剪開，D+、D− 直接焊到單晶片的 RX、TX，什麼也不會發生。','USB 的 D+／D− 傳的是封包與差動訊號，UART 是單端序列幀，必須有晶片負責轉換。'],
+      ['UART 和 USB 一樣要分主機與裝置。','兩塊單晶片的 TX、RX 交叉相接就能互傳，沒有誰當老大。','UART 是對等的；USB 一定是主機問、裝置答。'],
+      ['口譯員看得懂內容的意思。','電腦傳 LED_ON 給 Arduino，CH340C 不知道這是開燈，只是逐位元組搬運。','指令的意義由單晶片的程式決定，CH340C 只負責搬運與轉換。']
+    ],
+    3:[
+      ['CH340C 一定要外接石英。','照 CH340G 模組的圖再多加一顆 12 MHz 石英。','CH340C 內建振盪器，不需要；需要外接石英的是 CH340G 這類型號。'],
+      ['D+ 與 D− 接反也沒關係。','兩條線對調後，電腦完全偵測不到新裝置。','D+ 接 D+、D− 接 D−，差動訊號的極性不能反。'],
+      ['5V 供電時把 V3 也接到 VCC。','看到 V3 腳就順手接上 5V。','5V 供電時 V3 只外接電容、不連 VCC；3.3V 供電的接法不同，依資料表。']
+    ],
+    4:[
+      ['資料位元是高位元先送。','0x41 是 0100 0001，以為先送 0 1 0 0 0 0 0 1。','UART 是 LSB 先送，實際順序是 1 0 0 0 0 0 1 0。'],
+      ['一個字元只有 8 個位元時間。','算 115200 bps 每秒能傳 14400 個字元。','還有 Start 和 Stop，一個字元佔 10 個位元時間，約 11520 字元／秒。'],
+      ['USB 封包原樣出現在 TXD。','用邏輯分析儀看 TXD，卻找不到 SYNC 與 PID。','USB 封包的外殼在 CH340C 內部就拆掉了，TXD 上只有資料位元組。']
+    ],
+    5:[
+      ['單晶片一送出，電腦立刻收到。','程式剛送完一個字，電腦端馬上讀，常讀不到。','資料先進緩衝區，要等主機下次 IN 詢問才會送回，會有延遲。'],
+      ['看到 NAK 就是出錯。','抓 USB 封包時看到大量 NAK，以為通訊壞了。','NAK 只是「現在沒資料」，輪詢時很正常。'],
+      ['每個字元各自變成一個 USB 封包。','單晶片連續送 HELLO 五個字。','CH340C 常把緩衝區裡累積的位元組一次打包，不一定一字一包。']
+    ],
+    6:[
+      ['只要設定單晶片這邊的鮑率。','Arduino 程式是 9600，終端機卻開 115200，螢幕全是亂碼。','兩邊都要設成一樣。'],
+      ['鮑率就是每秒傳幾個位元組。','9600 baud 以為每秒 9600 個字元。','8N1 一個字元要 10 個位元，約每秒 960 個字元。'],
+      ['UART 有同步用的時脈線。','找不到 CLK 腳就以為接線少了。','UART 沒有時脈線，靠事先約好的鮑率加上 Start 位元的下降緣對時。']
+    ],
+    7:[
+      ['TX 要接對方的 TX。','TXD 接 MCU 的 TX，終端機一片空白。','嘴對耳朵：TXD 接 RX、RXD 接 TX。'],
+      ['不用接 GND，反正有訊號線。','CH340C 模組吃電腦供電，單晶片用電池，只接 TX、RX。','沒有共同參考的 0V，訊號電壓沒有意義，資料會亂或不通。'],
+      ['5V 的 TXD 可以直接接 3.3V 單晶片的 RX。','ESP32 的 RX 腳直接吃 5V 的 TXD。','可能損壞接腳。選 3.3V 模式，或用分壓、電平轉換。']
+    ],
+    9:[
+      ['插上去一定會有 COM 埠。','舊版 Windows 沒裝驅動，裝置管理員出現黃色驚嘆號。','要有驅動才會建立虛擬序列埠。'],
+      ['COM 編號是固定的。','換了一個 USB 孔，COM3 變成 COM7；Linux 的 ttyUSB0 變成 ttyUSB1。','編號由系統指派，要在軟體裡重新選。'],
+      ['COM 埠的鮑率就是 USB 的速度。','設 115200 就以為 USB 只有 115 kbps。','COM 的設定是 UART 側速度；USB 側仍用 Full Speed 12 Mbps。']
+    ]
+  };
+  Object.keys(MISTAKES).forEach(function(k){
+    var slide = document.querySelector('.slide[data-i="'+k+'"] .slide-inner');
+    var det = document.createElement('details'); det.className = 'mistakes';
+    det.innerHTML = '<summary><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="var(--coral-soft)" stroke="var(--coral)" stroke-width="1.5"/><path d="M9 5v5M9 12.2v.2" stroke="var(--coral)" stroke-width="1.8" stroke-linecap="round"/></svg><span>三個常見錯誤（各附例子）</span>'+CHEV+'</summary><ul class="m-list">'+
+      MISTAKES[k].map(function(m){ return '<li class="m-item"><p class="m-line"><span class="m-tag bad">誤解</span><span>'+m[0]+'</span></p><p class="m-line"><span class="m-tag eg">例子</span><span>'+m[1]+'</span></p><p class="m-line"><span class="m-tag ok">正解</span><span>'+m[2]+'</span></p></li>'; }).join('')+'</ul>';
+    slide.appendChild(det);
+  });
+
+  /* ---------------- quiz ---------------- */
+  var QUIZ = [
+    ['CH340C 在 USB 與 UART 之間的角色最像什麼？',['口譯員，兩邊的語言都會說','擴音器，只把訊號變大聲','延長線，只是把線接長'],0,'它自己處理 USB 協定，再把資料翻成 UART。'],
+    ['CH340C 的 TXD 應該接到單晶片的哪一腳？',['TX','RX','GND'],1,'嘴（TXD）要對著耳朵（RX）。'],
+    ['0x41 以 8N1 從 TXD 送出時，Start 之後的資料位元順序是？',['0 1 0 0 0 0 0 1','1 0 0 0 0 0 1 0','1 1 1 1 1 1 1 1'],1,'UART 的資料位元是 LSB 先送。'],
+    ['電腦詢問時 CH340C 的緩衝區是空的，它會回什麼？',['NAK','STALL 並停止工作','直接送 0x00'],0,'NAK 表示「還沒有資料，稍後再問」，是正常現象。'],
+    ['單晶片送 9600 bps，終端機開 115200，最可能看到？',['完全正常','亂碼','電腦當機'],1,'兩邊取樣速度不同，取樣點對不到正確的位元。']
+  ];
+  var quizDone = 0, quizScore = 0;
+  var ql = $('quizList');
+  QUIZ.forEach(function(q,qi){
+    var c = document.createElement('div'); c.className = 'q-card';
+    c.innerHTML = '<div class="q-title">'+(qi+1)+'. '+q[0]+'</div><div class="opts"></div><div class="q-explain"></div>';
+    var opts = c.querySelector('.opts'), ex = c.querySelector('.q-explain');
+    q[1].forEach(function(t,oi){
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'opt'; b.textContent = t;
+      b.addEventListener('click',function(){
+        Array.prototype.forEach.call(opts.children,function(x,k){ x.disabled = true; if (k===q[2]) x.classList.add('correct'); });
+        if (oi === q[2]){ quizScore++; } else { b.classList.add('wrong'); }
+        ex.textContent = (oi===q[2]?'答對了。':'再想想。')+q[3]; ex.classList.add('show');
+        quizDone++; $('score').textContent = quizScore+' / '+QUIZ.length;
+      });
+      opts.appendChild(b);
+    });
+    ql.appendChild(c);
+  });
+
+  /* ---------------- glossary ---------------- */
+  var GLOSS = {
+    resetp:{c:'RESET#',m:'RESET#',n:'RESET#（重置腳）',d:'MCU 的重置接腳，低電位有效：被拉低就重新開機。ATmega328P 的 PC6（第 1 腳）就是這一腳。'},
+    pullup:{c:'上拉電阻',m:'上拉電阻',n:'上拉電阻',d:'接在訊號線與電源之間的電阻，讓沒人驅動時線路穩定停在高電位。'},
+    cap:{c:'電容',m:'電容',n:'電容',d:'兩片極板中間隔絕緣體的元件，擋住直流、只放行電壓的快速變化，常用來耦合訊號。'},
+    negp:{c:'負脈衝',m:'負脈衝',n:'負脈衝',d:'電壓短暫掉下去再回來的一個窄波形。對低態有效的 RESET# 來說，這就是一次重置指令。'},
+    bootl:{c:'bootloader',m:'bootloader',n:'bootloader（開機載入程式）',d:'MCU 重置後最先跑的小程式，負責在短時間內等電腦上傳新程式，沒人上傳才跳去執行原本的程式。'},
+    ttl:{c:'TTL',m:'TTL',n:'TTL（Transistor-Transistor Logic）',d:'電晶體－電晶體邏輯，以雙極性電晶體結構組成。標準 TTL 在 Vcc = 5V 時：輸出 VOH ≥ 2.4V、VOL ≤ 0.5V；輸入 VIH ≥ 2V、VIL ≤ 0.8V。'},
+    usb:{c:'USB',m:'USB',n:'USB（通用序列匯流排）',d:'電腦與周邊最常見的有線介面。由<b>主機</b>主導、用封包傳資料。'},
+    uart:{c:'UART',m:'UART',n:'UART（通用非同步收發傳輸器）',d:'最簡單的序列通訊：一條 TX 送、一條 RX 收，一個位元一個位元地送，沒有時脈線。'},
+    ch340c:{c:'CH340C',m:'CH340C',n:'CH340C',d:'沁恒（WCH）的 USB 轉 UART 晶片，Arduino 模組、ESP 開發板上常見。'},
+    bridge:{c:'橋接器',m:'橋接器',n:'橋接器（Bridge）',d:'連接兩種不同通訊方式、並負責互相轉換的裝置。這裡的橋接器把 USB 與 UART 接在一起。'},
+    protocol:{c:'協定',m:'協定',n:'通訊協定',d:'雙方事先約定好的說話規則：資料的格式、順序、誰先說。USB 與 UART 的規則完全不同。'},
+    packet:{c:'封包',m:'封包',n:'封包（Packet）',d:'USB 傳資料的基本單位：開頭的同步、識別碼、資料與檢查碼打包在一起，像一封格式固定的信。'},
+    diff:{c:'差動訊號',m:'差動訊號',n:'差動訊號',d:'用 D+ 與 D− 兩條線的「電壓差」表示 0 與 1，抗雜訊能力強。UART 則是單一條線對地的電壓。'},
+    mcu:{c:'單晶片',m:'單晶片',n:'單晶片（MCU）',d:'把處理器、記憶體與接腳整合在一顆晶片的小電腦，例如 Arduino 的 ATmega328、ESP32。'},
+    txrx:{c:'TX／RX',m:'TX／RX',n:'TX 與 RX',d:'TX 是發送腳（嘴巴），RX 是接收腳（耳朵）。'},
+    udp:{c:'UD+／UD−',m:'UD+',n:'UD+、UD−',d:'CH340C 的 USB 側接腳，接電腦 USB 的 D+ 與 D−。'},
+    txdrxd:{c:'TXD／RXD',m:'TXD',n:'TXD 與 RXD',d:'CH340C 的 UART 側接腳。TXD 是發送，RXD 是接收，分別接單晶片的 RX 與 TX。'},
+    vcc:{c:'VCC',m:'VCC',n:'VCC',d:'電源正極腳，提供晶片工作電壓。'},
+    gnd:{c:'GND',m:'GND',n:'GND（地）',d:'0V 參考點，所有電壓都是相對它量出來的。'},
+    osc:{c:'振盪器',m:'振盪器',n:'振盪器',d:'產生穩定時脈的電路。USB 收發需要精準時脈，CH340C 把它做在晶片裡。'},
+    xtal:{c:'石英',m:'石英',n:'石英（晶體）',d:'外接的時脈元件，常見 12 MHz。CH340G 需要外接，CH340C 不需要。'},
+    volt:{c:'3.3V／5V',m:'3.3V',n:'3.3V 與 5V',d:'兩種常見的邏輯準位：高電位大約是 3.3V 或 5V。接錯可能不穩，甚至損壞接腳。'},
+    crc:{c:'CRC',m:'CRC',n:'CRC（循環冗餘檢查）',d:'依資料算出的檢查碼，附在封包尾端。收的人重算一次，不一致就知道傳錯了。'},
+    sync:{c:'SYNC',m:null,n:'SYNC',d:'USB 封包開頭的同步位元，讓接收端對齊時脈。'},
+    pid:{c:'PID',m:null,n:'PID（封包識別碼）',d:'說明這是哪一種封包，例如 IN、OUT、資料、ACK。'},
+    byte:{c:'位元組',m:'位元組',n:'位元組（Byte）',d:'8 個位元，可以表示 0 到 255，一個英文字母就是一個位元組。'},
+    start:{c:'Start',m:'Start',n:'Start 位元',d:'UART 每個字元的開頭，固定是 0（拉低）。接收端看到線路從高掉到低，就知道有字元要來了。'},
+    dbit:{c:'資料位元',m:'資料位元',n:'資料位元',d:'字元本身的 8 個位元 D0 到 D7。'},
+    lsb:{c:'LSB',m:'LSB',n:'LSB（最低有效位元）',d:'一個位元組中權重最小的那一位，也就是 D0。LSB 先送表示 D0 最先出現在線上。'},
+    stop:{c:'Stop',m:'Stop',n:'Stop 位元',d:'每個字元結尾，固定是 1（拉高），也讓線路回到閒置。'},
+    n81:{c:'8N1',m:'8N1',n:'8N1',d:'最常見的 UART 格式：8 個資料位元、無同位檢查（N）、1 個 Stop 位元。'},
+    host:{c:'主機',m:'主機',n:'USB 主機（Host）',d:'USB 通訊的發起者，通常是電腦。裝置只能被問了才回答。'},
+    buffer:{c:'緩衝區',m:'緩衝區',n:'緩衝區（Buffer）',d:'暫時存放資料的小記憶體，讓收資料與送資料的速度可以不一樣。'},
+    inq:{c:'IN 詢問',m:'IN 詢問',n:'IN 詢問',d:'USB 主機對裝置說：「有資料要給我嗎？」裝置有資料就回資料，沒有就回 NAK。'},
+    poll:{c:'輪詢',m:'輪詢',n:'輪詢（Polling）',d:'主機每隔一小段時間就問一次，而不是等裝置主動通知。'},
+    nak:{c:'NAK',m:'NAK',n:'NAK',d:'USB 的回應之一，意思是「現在沒有資料，稍後再問」，不是錯誤。'},
+    clkline:{c:'時脈線',m:'時脈線',n:'時脈線（Clock）',d:'另外一條專門打節拍的線，讓收發雙方同步。UART 沒有。'},
+    baud:{c:'鮑率',m:'鮑率',n:'鮑率（Baud rate）',d:'UART 每秒送出的訊號個數，8N1 下約等於每秒位元數。常見 9600、115200。'},
+    bps:{c:'bps',m:'bps',n:'bps',d:'bits per second，每秒幾個位元。'},
+    fall:{c:'下降緣',m:'下降緣',n:'下降緣',d:'電壓從高變低的那一瞬間。UART 的 Start 位元就是一個下降緣。'},
+    sample:{c:'取樣',m:'取樣',n:'取樣',d:'在某個時間點讀一次線上的電壓，判斷是 0 或 1。'},
+    framing:{c:'framing error',m:null,n:'Framing error（框架錯誤）',d:'該是 Stop 位元（1）的地方讀到 0，代表位元對不齊，常見原因是鮑率不一致。'},
+    cgnd:{c:'共地',m:'共地',n:'共地',d:'把兩個裝置的 GND 接在一起，讓它們對「0V 在哪裡」有同樣的基準。'},
+    level:{c:'電壓準位',m:'電壓準位',n:'電壓準位（邏輯準位）',d:'代表 0 與 1 的電壓範圍，3.3V 系統與 5V 系統不同。'},
+    shift:{c:'電平轉換',m:null,n:'電平轉換',d:'讓 5V 與 3.3V 兩邊安全溝通的電路或模組，簡單情況也可以用電阻分壓。'},
+    enumr:{c:'列舉',m:'列舉',n:'列舉（Enumeration）',d:'USB 裝置接上後，主機詢問它的身分、指派位址、再決定載入哪個驅動的流程。'},
+    vidpid:{c:'VID:PID',m:'VID:PID',n:'VID:PID',d:'廠商代碼加產品代碼，電腦靠它找驅動。CH340 常見是 1A86:7523。'},
+    driver:{c:'驅動程式',m:'驅動程式',n:'驅動程式',d:'讓作業系統認得並操作某個硬體的軟體。'},
+    com:{c:'COM 埠',m:'COM 埠',n:'COM 埠',d:'Windows 上序列埠的名稱，例如 COM3。Linux 常叫 /dev/ttyUSB0。'},
+    vcom:{c:'虛擬序列埠',m:'虛擬序列埠',n:'虛擬序列埠',d:'沒有真正的 RS-232 接頭，由驅動在電腦裡模擬出來、應用程式當作序列埠使用的埠。'}
+  };
+  var STRIPS = {
+    2:['protocol','packet','diff','mcu','txrx','bridge','ch340c'],
+    3:['udp','txdrxd','vcc','gnd','osc','xtal','volt'],
+    4:['crc','sync','pid','byte','start','dbit','lsb','stop','n81'],
+    5:['host','buffer','inq','poll','nak'],
+    6:['clkline','baud','bps','fall','sample','framing'],
+    7:['ttl','cgnd','level','shift'],
+    8:['resetp','pullup','cap','negp','bootl'],
+    9:['enumr','vidpid','driver','com','vcom']
+  };
+  var EXTRA_WRAPS = [
+    ['#s0sub','usb','USB'],['#s0sub','uart','UART'],['#s0sub','ch340c','CH340C'],
+    ['#keyPoints','packet','封包'],['#keyPoints','bridge','橋接器'],['#keyPoints','buffer','緩衝區'],['#keyPoints','baud','鮑率'],['#keyPoints','enumr','列舉'],['#keyPoints','level','電壓準位'],['#keyPoints','txrx','TX'],['#keyPoints','com','COM 埠']
+  ];
+  var tip = $('tip'), deck = $('deck'), tipFor = null;
+  function hideTip(){ if (tip){ tip.hidden = true; } tipFor = null; }
+  function showTip(term){
+    var g = GLOSS[term.getAttribute('data-g')];
+    if (!g) return;
+    if (tipFor === term && !tip.hidden){ hideTip(); return; }
+    tip.innerHTML = '<b>'+g.n+'</b><br>'+g.d;
+    tip.hidden = false; tipFor = term;
+    var dr = deck.getBoundingClientRect(), r = term.getBoundingClientRect();
+    var w = Math.min(340, dr.width-32);
+    tip.style.width = w+'px';
+    var left = Math.max(16, Math.min(r.left-dr.left, dr.width-w-16));
+    var h = tip.offsetHeight, top = r.bottom-dr.top+8;
+    if (top+h > dr.height-84){ top = Math.max(8, r.top-dr.top-h-8); }
+    tip.style.left = left+'px'; tip.style.top = top+'px';
+  }
+  function wrapTerm(root,key,match){
+    var walker = document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:function(n){
+      return n.parentNode.closest('.term,button,summary') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    }});
+    var node;
+    while ((node = walker.nextNode())){
+      var i = node.nodeValue.indexOf(match);
+      if (i < 0) continue;
+      var mid = node.splitText(i);
+      mid.splitText(match.length);
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'term'; b.setAttribute('data-g',key);
+      mid.parentNode.replaceChild(b,mid);
+      b.appendChild(mid);
+      return true;
+    }
+    return false;
+  }
+  function buildStrip(i){
+    var slide = document.querySelector('.slide[data-i="'+i+'"]');
+    var lede = slide.querySelector('.lede');
+    var keys = STRIPS[i];
+    var det = document.createElement('details');
+    det.className = 'gloss'; det.open = true;
+    det.innerHTML = '<summary><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><rect x="2.5" y="3" width="13" height="12" rx="2.5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/><path d="M6 7h6M6 10h4" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/></svg><span>名詞小卡（'+keys.length+'）：先認識這些名詞</span>'+CHEV+'</summary><div class="gloss-body"><div class="gchips"></div><div class="gpanel" aria-live="polite"><span class="dim">點一下上面的名詞，這裡會顯示解釋。文中有虛線底線的字也能直接點。</span></div></div>';
+    var chips = det.querySelector('.gchips'), panel = det.querySelector('.gpanel');
+    keys.forEach(function(k){
+      var g = GLOSS[k];
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'gchip'; b.setAttribute('aria-pressed','false'); b.textContent = g.c;
+      b.addEventListener('click',function(){
+        Array.prototype.forEach.call(chips.children,function(x){ x.setAttribute('aria-pressed',x===b?'true':'false'); });
+        panel.innerHTML = '<b>'+g.n+'</b><br>'+g.d;
+      });
+      chips.appendChild(b);
+    });
+    lede.insertAdjacentElement('afterend',det);
+  }
+  Object.keys(STRIPS).forEach(function(k){ buildStrip(parseInt(k,10)); });
+  Object.keys(STRIPS).forEach(function(k){
+    var slide = document.querySelector('.slide[data-i="'+k+'"]');
+    var roots = slide.querySelectorAll('.lede,.hint');
+    STRIPS[k].forEach(function(key){
+      var g = GLOSS[key];
+      if (!g || !g.m) return;
+      for (var r=0;r<roots.length;r++){ if (wrapTerm(roots[r],key,g.m)) break; }
+    });
+  });
+  EXTRA_WRAPS.forEach(function(w){
+    var root = document.querySelector(w[0]);
+    if (root) wrapTerm(root,w[1],w[2]);
+  });
+  document.addEventListener('click',function(e){
+    var t = e.target.closest ? e.target.closest('.term') : null;
+    if (t){ showTip(t); return; }
+    if (!e.target.closest('.tip')) hideTip();
+  });
+  document.addEventListener('keydown',function(e){ if (e.key === 'Escape') hideTip(); });
+  document.addEventListener('scroll',hideTip,true);
+
+  render();
+})();
+</script>
+
+</body></html>

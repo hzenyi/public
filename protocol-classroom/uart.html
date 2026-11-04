@@ -1,0 +1,1337 @@
+<title>UART 通訊教室</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg:#faf7ee;
+    --surface:#ffffff;
+    --surface-2:#eef6ee;
+    --ink:#233229;
+    --muted:#6f8074;
+    --line:#dfe9e0;
+    --accent:#2f9e8f;
+    --accent-soft:#d6f0ea;
+    --accent-ink:#ffffff;
+    --amber:#eeab33;
+    --amber-soft:#fbe9c8;
+    --amber-ink:#3c2a04;
+    --coral:#e2665b;
+    --coral-soft:#fbe1de;
+    --shadow: 0 18px 40px -22px rgba(35,50,41,.35);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141d18;
+      --surface:#1c2721;
+      --surface-2:#223028;
+      --ink:#eef5ee;
+      --muted:#9db3a4;
+      --line:#31413a;
+      --accent:#5fd0bd;
+      --accent-soft:#20423c;
+      --accent-ink:#0c2320;
+      --amber:#f2c369;
+      --amber-soft:#3d3013;
+      --amber-ink:#fdf3dd;
+      --coral:#f0958c;
+      --coral-soft:#402322;
+      --shadow: 0 18px 40px -20px rgba(0,0,0,.55);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141d18;
+    --surface:#1c2721;
+    --surface-2:#223028;
+    --ink:#eef5ee;
+    --muted:#9db3a4;
+    --line:#31413a;
+    --accent:#5fd0bd;
+    --accent-soft:#20423c;
+    --accent-ink:#0c2320;
+    --amber:#f2c369;
+    --amber-soft:#3d3013;
+    --amber-ink:#fdf3dd;
+    --coral:#f0958c;
+    --coral-soft:#402322;
+    --shadow: 0 18px 40px -20px rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Noto Sans TC","Baloo 2",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .latin{
+    font-family:"Baloo 2","Noto Sans TC",sans-serif;
+  }
+  .mono{
+    font-family:"JetBrains Mono",monospace;
+  }
+  h1,h2,h3{ text-wrap:balance; margin:0; }
+  p{ margin:0; }
+  button{ font-family:inherit; }
+
+  /* ---------- deck shell ---------- */
+  .deck{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow:hidden;
+  }
+  .progress-track{
+    height:5px;
+    background:var(--surface-2);
+    flex:none;
+  }
+  .progress-fill{
+    height:100%;
+    width:12.5%;
+    background:linear-gradient(90deg,var(--accent),var(--amber));
+    transition:width .45s cubic-bezier(.65,0,.35,1);
+  }
+  .slides{
+    flex:1;
+    position:relative;
+    min-height:0;
+  }
+  .slide{
+    position:absolute;
+    inset:0;
+    display:flex;
+    justify-content:center;
+    padding: clamp(20px,4vw,48px) clamp(16px,6vw,72px) clamp(84px,10vh,120px);
+    opacity:0;
+    transform:translateX(36px) scale(.99);
+    transition:opacity .5s ease, transform .5s ease;
+    pointer-events:none;
+    overflow-y:auto;
+  }
+  .slide.leaving-back{ transform:translateX(-36px) scale(.99); }
+  .slide.active{
+    opacity:1;
+    transform:translateX(0) scale(1);
+    pointer-events:auto;
+  }
+  .slide-inner{
+    width:100%;
+    max-width:920px;
+    margin:auto;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    align-self:flex-start;
+    font-family:"Baloo 2",sans-serif;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    background:var(--accent-soft);
+    padding:6px 14px;
+    border-radius:999px;
+  }
+  .slide h2{
+    font-size:clamp(24px,4vw,36px);
+    font-weight:900;
+    line-height:1.25;
+  }
+  .slide h2 .num{
+    font-family:"Baloo 2",sans-serif;
+    color:var(--accent);
+    margin-right:8px;
+  }
+  .lede{
+    font-size:clamp(14.5px,2vw,16.5px);
+    line-height:1.85;
+    color:var(--ink);
+    max-width:68ch;
+  }
+  .lede b{ color:var(--accent); font-weight:700; }
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:20px;
+    box-shadow:var(--shadow);
+  }
+  .hint{
+    font-size:12.5px;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .hint svg{ flex:none; }
+
+  /* ---------- nav ---------- */
+  .nav{
+    position:fixed;
+    left:0;right:0;bottom:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(180deg, transparent, var(--bg) 40%);
+  }
+  .nav-btn{
+    width:44px;height:44px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    box-shadow:var(--shadow);
+    font-size:18px;
+    transition:transform .15s ease, background .15s ease;
+    flex:none;
+  }
+  .nav-btn:hover{ transform:translateY(-2px); }
+  .nav-btn:disabled{ opacity:.35; cursor:default; transform:none; }
+  .nav-btn:focus-visible, .flip-card:focus-visible, .seg:focus-visible, .opt:focus-visible, .cta:focus-visible, .pin:focus-visible, input:focus-visible{
+    outline:3px solid var(--accent);
+    outline-offset:2px;
+  }
+  .dots{ display:flex; gap:7px; padding:0 6px; }
+  .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--line);
+    border:none;cursor:pointer;
+    transition:all .25s ease;
+    padding:0;
+  }
+  .dot.on{ width:22px; background:var(--accent); border-radius:6px; }
+
+  .cta{
+    align-self:flex-start;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    background:var(--accent);
+    color:var(--accent-ink);
+    border:none;
+    padding:13px 24px;
+    border-radius:999px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:var(--shadow);
+    transition:transform .15s ease;
+  }
+  .cta:hover{ transform:translateY(-2px); }
+  .cta.secondary{
+    background:var(--surface);
+    color:var(--ink);
+    border:1px solid var(--line);
+  }
+  .cta.ghost{
+    background:transparent;
+    color:var(--accent);
+    box-shadow:none;
+    border:1.5px dashed var(--accent);
+  }
+
+  /* ---------- decorative doodles ---------- */
+  .leaf{ position:absolute; opacity:.55; }
+  .field-note{
+    background:
+      repeating-linear-gradient(var(--surface) 0 27px, var(--line) 27px 28px);
+  }
+
+  /* ============ SLIDE 0 : title ============ */
+  .s0-inner{ align-items:center; text-align:center; gap:26px; }
+  .s0-badge{
+    width:96px;height:96px;border-radius:26px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    box-shadow:var(--shadow);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .s0-title{
+    font-size:clamp(34px,7vw,58px);
+    font-weight:900;
+    line-height:1.15;
+  }
+  .s0-title .latin{ color:var(--accent); font-weight:800; }
+  .s0-sub{
+    font-size:clamp(14.5px,2.2vw,17px);
+    color:var(--muted);
+    max-width:52ch;
+    line-height:1.8;
+  }
+  .s0-tags{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+  .s0-tag{
+    font-family:"Baloo 2",sans-serif;
+    font-size:12.5px;
+    font-weight:700;
+    letter-spacing:.03em;
+    padding:7px 14px;
+    border-radius:999px;
+    background:var(--surface-2);
+    color:var(--ink);
+    border:1px solid var(--line);
+  }
+  .pulse-strip{
+    width:min(520px,90%);
+    height:64px;
+  }
+  .pulse-strip path{
+    fill:none;
+    stroke:var(--accent);
+    stroke-width:3;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+  }
+  .pulse-dot{
+    fill:var(--amber);
+    animation:travel 3.4s linear infinite;
+  }
+  @keyframes travel{
+    0%{ transform:translateX(0); }
+    100%{ transform:translateX(500px); }
+  }
+
+  /* ============ SLIDE 1 : what is uart ============ */
+  .letters{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+  }
+  @media (max-width:560px){ .letters{ grid-template-columns:repeat(2,1fr);} }
+  .flip-card{
+    perspective:1000px;
+    height:132px;
+    cursor:pointer;
+    background:transparent;
+    border:none;
+    padding:0;
+  }
+  .flip-inner{
+    position:relative;
+    width:100%;height:100%;
+    transition:transform .55s cubic-bezier(.65,0,.35,1);
+    transform-style:preserve-3d;
+  }
+  .flip-card.flipped .flip-inner{ transform:rotateY(180deg); }
+  .flip-face{
+    position:absolute; inset:0;
+    border-radius:16px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    backface-visibility:hidden;
+    padding:10px;
+    text-align:center;
+    border:1px solid var(--line);
+  }
+  .flip-front{
+    background:var(--surface);
+    box-shadow:var(--shadow);
+  }
+  .flip-front .big{
+    font-family:"Baloo 2",sans-serif;
+    font-size:40px;
+    font-weight:800;
+    color:var(--accent);
+  }
+  .flip-front .small{
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+  .flip-back{
+    background:var(--accent);
+    color:var(--accent-ink);
+    transform:rotateY(180deg);
+  }
+  .flip-back .word{
+    font-family:"Baloo 2",sans-serif;
+    font-weight:700;
+    font-size:14px;
+  }
+  .flip-back .desc{
+    font-size:12px;
+    margin-top:6px;
+    line-height:1.5;
+    opacity:.95;
+  }
+
+  /* ============ SLIDE 2 : TX/RX ============ */
+  .board-wrap{
+    display:flex;
+    justify-content:center;
+  }
+  .board-svg{ width:100%; max-width:560px; height:auto; }
+  .pin{ cursor:pointer; }
+  .pin rect{ transition:filter .2s ease; }
+  .pin:hover rect, .pin.active rect{ filter:brightness(1.1); }
+  .wire{ stroke-width:3; fill:none; stroke-linecap:round; }
+  .wire-tx{ stroke:var(--accent); }
+  .wire-rx{ stroke:var(--amber); }
+  .wire-gnd{ stroke:var(--muted); stroke-dasharray:4 5; }
+  .data-dot{ opacity:0; }
+  .data-dot.run{ animation:runDot 1.6s ease-in-out; }
+  @keyframes runDot{
+    0%{ opacity:0; offset-distance:0%; }
+    8%{ opacity:1; }
+    92%{ opacity:1; }
+    100%{ opacity:0; offset-distance:100%; }
+  }
+  .pin-info{
+    min-height:64px;
+    background:var(--surface-2);
+    border-radius:14px;
+    padding:14px 16px;
+    font-size:13.5px;
+    line-height:1.7;
+    color:var(--ink);
+  }
+  .pin-info b{ color:var(--accent); }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; }
+
+  /* ============ SLIDE 3 : GND ============ */
+  .gnd-diagram{ display:flex; flex-direction:column; gap:16px; }
+  .gnd-svg{ width:100%; max-width:560px; height:auto; margin:0 auto; display:block; }
+  #gndBaselineB{ transition:transform .25s ease; }
+  #gndBaselineB.floating{ animation:gndFloat 1.4s ease-in-out infinite; }
+  @keyframes gndFloat{
+    0%,100%{ transform:translateY(0); }
+    30%{ transform:translateY(-9px); }
+    65%{ transform:translateY(6px); }
+  }
+  #gndWire.broken{ stroke-dasharray:6 7; stroke:var(--coral); }
+  #gndSwitchIcon{ transition:transform .2s ease; }
+  #gndSwitchIcon.off{ transform:translate(260px,50px) rotate(90deg) scale(1.05); }
+  .bit-compare{ display:flex; flex-direction:column; gap:8px; }
+  .bit-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .bit-row .row-label{ font-size:12.5px; color:var(--muted); width:100px; flex:none; }
+  .bits{ display:flex; gap:5px; flex-wrap:wrap; }
+  .bit{
+    width:30px;height:30px;
+    border-radius:8px;
+    background:var(--surface);
+    border:1.5px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-family:"JetBrains Mono",monospace;
+    font-weight:700;
+    font-size:14px;
+    color:var(--ink);
+    transition:all .2s ease;
+  }
+  .bit.bit-bad{ border-color:var(--coral); background:var(--coral-soft); color:var(--coral); }
+  .gnd-result{
+    background:var(--surface-2);
+    border-radius:14px;
+    padding:12px 16px;
+    font-size:13.5px;
+    line-height:1.7;
+  }
+
+  /* ============ SLIDE 3 : frame ============ */
+  .frame-row{
+    display:flex;
+    gap:3px;
+    overflow-x:auto;
+    padding-bottom:6px;
+  }
+  .seg{
+    flex:none;
+    min-width:52px;
+    height:74px;
+    border-radius:10px;
+    border:2px solid var(--line);
+    background:var(--surface);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:transform .15s ease, border-color .15s ease;
+    padding:4px;
+  }
+  .seg .lvl{ font-family:"JetBrains Mono",monospace; font-weight:700; font-size:15px; }
+  .seg .lbl{ font-size:9.5px; color:var(--muted); margin-top:4px; text-align:center; line-height:1.3; }
+  .seg.idle{ background:var(--surface-2); }
+  .seg.start{ border-color:var(--coral); }
+  .seg.start .lvl{ color:var(--coral); }
+  .seg.data{ border-color:var(--accent); }
+  .seg.data .lvl{ color:var(--accent); }
+  .seg.parity{ border-color:var(--amber); }
+  .seg.parity .lvl{ color:var(--amber-ink); background:transparent; }
+  .seg.stop{ border-color:var(--coral); }
+  .seg.stop .lvl{ color:var(--coral); }
+  .seg.selected{ transform:translateY(-6px); box-shadow:var(--shadow); }
+  .frame-detail{
+    background:var(--surface-2);
+    border-radius:16px;
+    padding:16px 18px;
+    font-size:13.5px;
+    line-height:1.75;
+    min-height:92px;
+  }
+  .frame-detail .tag{
+    font-family:"Baloo 2",sans-serif;
+    font-weight:700;
+    font-size:12.5px;
+    letter-spacing:.04em;
+    display:inline-block;
+    margin-bottom:6px;
+    padding:3px 10px;
+    border-radius:999px;
+  }
+
+  /* ============ SLIDE 4 : baud ============ */
+  .baud-panel{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .baud-readout{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .baud-readout .val{
+    font-family:"Baloo 2",sans-serif;
+    font-size:clamp(30px,5vw,44px);
+    font-weight:800;
+    color:var(--accent);
+  }
+  .baud-readout .unit{ font-size:14px; color:var(--muted); }
+  input[type=range]{
+    width:100%;
+    accent-color:var(--accent);
+    height:6px;
+  }
+  .baud-marks{
+    display:flex;
+    justify-content:space-between;
+    font-size:10.5px;
+    color:var(--muted);
+    font-family:"JetBrains Mono",monospace;
+  }
+  .pulse-box{
+    background:var(--surface-2);
+    border-radius:16px;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .pulse-visual{
+    height:10px;
+    border-radius:999px;
+    background:var(--accent);
+  }
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;
+  }
+  .stat{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px 14px;
+  }
+  .stat .k{ font-size:11px; color:var(--muted); }
+  .stat .v{ font-family:"JetBrains Mono",monospace; font-weight:700; font-size:16px; margin-top:2px; }
+
+  /* ============ SLIDE 5 : simulate ============ */
+  .char-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .char-btn{
+    width:44px;height:44px;
+    border-radius:12px;
+    border:1.5px solid var(--line);
+    background:var(--surface);
+    font-family:"Baloo 2",sans-serif;
+    font-weight:700;
+    font-size:17px;
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .char-btn.sel{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  .wave-wrap{
+    background:var(--surface-2);
+    border-radius:16px;
+    padding:16px;
+    overflow-x:auto;
+  }
+  .wave-svg{ min-width:640px; width:100%; height:130px; }
+  .wave-line{ fill:none; stroke:var(--accent); stroke-width:2.5; }
+  .wave-mask{ fill:var(--coral); opacity:.3; }
+  .wave-mask-text{ fill:#fff; stroke:var(--coral); stroke-width:2px; paint-order:stroke fill; font-weight:800; }
+  .wave-labels{
+    display:flex;
+    width:100%;
+    min-width:640px;
+  }
+  .wave-labels span{
+    flex:1 1 0;
+    width:0;
+    text-align:center;
+    font-family:"JetBrains Mono",monospace;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+  .now-strip{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px 16px;
+    font-size:13.5px;
+    min-height:22px;
+  }
+  .now-strip b{ color:var(--accent); }
+  .toggle-row{ display:flex; align-items:center; gap:8px; font-size:13px; }
+  .ascii-table{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    font-family:"JetBrains Mono",monospace;
+    font-size:12.5px;
+  }
+  .ascii-table div{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:6px 10px; }
+
+  /* ============ SLIDE 6 : quiz ============ */
+  .quiz-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .score-pill{
+    font-family:"Baloo 2",sans-serif;
+    font-weight:700;
+    font-size:13px;
+    background:var(--amber-soft);
+    color:var(--amber-ink);
+    padding:6px 14px;
+    border-radius:999px;
+  }
+  .q-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:16px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .q-title{ font-weight:700; font-size:14.5px; }
+  .opts{ display:flex; flex-direction:column; gap:8px; }
+  .opt{
+    text-align:left;
+    padding:10px 14px;
+    border-radius:12px;
+    border:1.5px solid var(--line);
+    background:var(--surface-2);
+    cursor:pointer;
+    font-size:13.5px;
+    color:var(--ink);
+  }
+  .opt.correct{ border-color:var(--accent); background:var(--accent-soft); }
+  .opt.wrong{ border-color:var(--coral); background:var(--coral-soft); }
+  .opt:disabled{ cursor:default; }
+  .q-explain{
+    font-size:12.5px;
+    color:var(--muted);
+    line-height:1.6;
+    display:none;
+  }
+  .q-explain.show{ display:block; }
+
+  /* ============ SLIDE 7 : summary ============ */
+  .sum-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px;
+  }
+  @media (max-width:560px){ .sum-grid{ grid-template-columns:1fr; } }
+  .sum-item{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px;
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+    font-size:13px;
+    line-height:1.6;
+  }
+  .sum-item svg{ flex:none; margin-top:2px; }
+  .sum-item b{ display:block; font-size:13.5px; margin-bottom:2px; }
+  .thanks-note{
+    background:var(--surface-2);
+    border-radius:16px;
+    padding:16px 18px;
+    font-size:13.5px;
+    line-height:1.8;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .slide, .flip-inner, .cta, .nav-btn{ transition:none !important; }
+    .pulse-dot, .data-dot.run{ animation:none !important; }
+  }
+</style>
+
+<div class="deck" id="deck">
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="slides" id="slides">
+
+    <!-- SLIDE 0 -->
+    <section class="slide" data-i="0">
+      <div class="slide-inner s0-inner">
+        <div class="s0-badge">
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <rect x="4" y="4" width="44" height="44" rx="12" fill="var(--accent-soft)"/>
+            <path d="M12 26h6l3-9 6 18 3-9h10" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="eyebrow">電路設計課 · CIRCUIT DESIGN</div>
+        <h1 class="s0-title"><span class="latin">UART</span> 通訊協定</h1>
+        <p class="s0-sub">一次搞懂序列通訊的基礎：<b style="color:var(--ink)">TX、RX、鮑率、起始位元、同位位元與結束位元</b>，並實際看看一個位元組是怎麼被送出去的。</p>
+        <svg class="pulse-strip" viewBox="0 0 520 64" preserveAspectRatio="none">
+          <path d="M0 46 H40 V18 H90 V46 H150 V18 H180 V46 H230 V18 H260 V46 H320 V18 H360 V46 H420 V18 H460 V46 H520" />
+        </svg>
+        <div class="s0-tags">
+          <span class="s0-tag latin">TX / RX</span>
+          <span class="s0-tag latin">BAUD RATE</span>
+          <span class="s0-tag">起始 · 同位 · 結束位元</span>
+        </div>
+        <button class="cta" id="startBtn">開始上課
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8h8M8 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- SLIDE 1 -->
+    <section class="slide" data-i="1">
+      <div class="slide-inner">
+        <div class="eyebrow">01 · 認識 UART</div>
+        <h2><span class="num latin">01</span>什麼是 UART？</h2>
+        <p class="lede"><span class="latin" style="font-weight:700;color:var(--accent)">UART</span>（Universal Asynchronous Receiver/Transmitter，通用非同步收發傳輸器）是最基礎、最常見的序列通訊協定之一，Arduino、感測器模組、GPS、藍牙模組之間，常常就是靠它交換資料。它的核心精神是<b>非同步（Asynchronous）</b>：兩個裝置之間<u>不共用時脈訊號</u>，全靠雙方事先講好的「鮑率」來對齊時間節奏。</p>
+        <div class="letters" id="letters"></div>
+        <p class="hint">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M7 4v3.2l2 1.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          點一下卡片，看看 U·A·R·T 每個字母代表什麼
+        </p>
+      </div>
+    </section>
+
+    <!-- SLIDE 2 -->
+    <section class="slide" data-i="2">
+      <div class="slide-inner">
+        <div class="eyebrow">02 · 接腳連接</div>
+        <h2><span class="num latin">02</span>接腳連接：TX 與 RX</h2>
+        <p class="lede">每個支援 UART 的裝置都有兩隻對外接腳：<b>TX（Transmit，傳送）</b>負責把資料送出去，<b>RX（Receive，接收）</b>負責把資料收進來。連接兩個裝置時要「<b>交叉接</b>」：A 的 TX 接到 B 的 RX，A 的 RX 接到 B 的 TX——就像講電話，你的嘴巴要對到對方的耳朵。別忘了把兩邊的 <span class="latin" style="font-weight:700">GND</span> 接在一起，才有共同的電壓基準。</p>
+        <div class="board-wrap">
+          <svg class="board-svg" viewBox="0 0 520 220" id="boardSvg">
+            <rect x="20" y="30" width="140" height="160" rx="16" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <text x="90" y="56" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="700" font-size="15" fill="var(--ink)">裝置 A</text>
+            <rect x="360" y="30" width="140" height="160" rx="16" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <text x="430" y="56" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="700" font-size="15" fill="var(--ink)">裝置 B</text>
+
+            <path class="wire wire-tx" d="M160 78 C 260 78, 260 138, 360 138"/>
+            <path class="wire wire-rx" d="M160 138 C 260 138, 260 78, 360 78"/>
+            <path class="wire wire-gnd" d="M160 168 H360"/>
+
+            <circle class="data-dot" id="dotAB" r="6" fill="var(--accent)">
+              <animateMotion id="animAB" dur="1.6s" begin="indefinite" fill="freeze" path="M160 78 C 260 78, 260 138, 360 138"/>
+            </circle>
+            <circle class="data-dot" id="dotBA" r="6" fill="var(--amber)">
+              <animateMotion id="animBA" dur="1.6s" begin="indefinite" fill="freeze" path="M360 78 C 260 78, 260 138, 160 138"/>
+            </circle>
+
+            <g class="pin" data-pin="txA" transform="translate(120,68)"><rect x="0" y="0" width="40" height="20" rx="6" fill="var(--accent)"/><text x="20" y="14" text-anchor="middle" font-family="Baloo 2" font-size="11" font-weight="700" fill="var(--accent-ink)">TX</text></g>
+            <g class="pin" data-pin="rxA" transform="translate(120,128)"><rect x="0" y="0" width="40" height="20" rx="6" fill="var(--amber)"/><text x="20" y="14" text-anchor="middle" font-family="Baloo 2" font-size="11" font-weight="700" fill="var(--amber-ink)">RX</text></g>
+            <g class="pin" data-pin="gndA" transform="translate(120,158)"><rect x="0" y="0" width="40" height="20" rx="6" fill="var(--muted)"/><text x="20" y="14" text-anchor="middle" font-family="Baloo 2" font-size="11" font-weight="700" fill="var(--surface)">GND</text></g>
+
+            <g class="pin" data-pin="txB" transform="translate(360,68)"><rect x="0" y="0" width="40" height="20" rx="6" fill="var(--accent)"/><text x="20" y="14" text-anchor="middle" font-family="Baloo 2" font-size="11" font-weight="700" fill="var(--accent-ink)">TX</text></g>
+            <g class="pin" data-pin="rxB" transform="translate(360,128)"><rect x="0" y="0" width="40" height="20" rx="6" fill="var(--amber)"/><text x="20" y="14" text-anchor="middle" font-family="Baloo 2" font-size="11" font-weight="700" fill="var(--amber-ink)">RX</text></g>
+            <g class="pin" data-pin="gndB" transform="translate(360,158)"><rect x="0" y="0" width="40" height="20" rx="6" fill="var(--muted)"/><text x="20" y="14" text-anchor="middle" font-family="Baloo 2" font-size="11" font-weight="700" fill="var(--surface)">GND</text></g>
+          </svg>
+        </div>
+        <div class="pin-info" id="pinInfo">👆 點一下上面任一個接腳，看看它的功用；或按下面按鈕看看資料怎麼跑。</div>
+        <div class="btn-row">
+          <button class="cta" id="sendAB">送出示範資料：A → B</button>
+          <button class="cta secondary" id="sendBA">送出示範資料：B → A</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3 : GND -->
+    <section class="slide" data-i="3">
+      <div class="slide-inner">
+        <div class="eyebrow">03 · 共地是關鍵</div>
+        <h2><span class="num latin">03</span>為什麼一定要接 GND？</h2>
+        <p class="lede">高電位、低電位其實都是「相對」的：裝置判斷 0 或 1，靠的是訊號電壓和自己 <b>0V 參考點（GND）</b>之間的差距。如果兩個裝置沒有共用 GND，雙方的 0V 基準就會各自漂移、對不齊，接收端量到的電壓就可能完全誤判。按下按鈕，實際比較「有共地」跟「沒共地」的差別：</p>
+        <div class="gnd-diagram">
+          <svg class="gnd-svg" viewBox="0 0 520 150" preserveAspectRatio="xMidYMid meet">
+            <rect x="16" y="16" width="140" height="70" rx="14" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <text x="86" y="42" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="700" font-size="14" fill="var(--ink)">裝置 A</text>
+            <line x1="26" y1="66" x2="146" y2="66" stroke="var(--muted)" stroke-width="2"/>
+            <text x="86" y="80" text-anchor="middle" font-family="Noto Sans TC" font-size="9.5" fill="var(--muted)">A 的 0V 參考</text>
+
+            <rect x="364" y="16" width="140" height="70" rx="14" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <text x="434" y="42" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="700" font-size="14" fill="var(--ink)">裝置 B</text>
+            <g id="gndBaselineB">
+              <line x1="374" y1="66" x2="494" y2="66" stroke="var(--muted)" stroke-width="2"/>
+              <text x="434" y="80" text-anchor="middle" font-family="Noto Sans TC" font-size="9.5" fill="var(--muted)">B 的 0V 參考</text>
+            </g>
+
+            <path id="gndWire" d="M156 66 H364" stroke="var(--accent)" stroke-width="3" fill="none"/>
+            <g id="gndSwitchIcon" transform="translate(260,50)">
+              <circle r="13" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+              <text x="0" y="5" text-anchor="middle" font-size="14">🔌</text>
+            </g>
+            <text x="260" y="102" text-anchor="middle" font-family="Noto Sans TC" font-size="10.5" fill="var(--muted)">GND 連接線</text>
+          </svg>
+          <button class="cta" id="gndToggle">🔌 GND 已連接（點一下模擬斷開）</button>
+          <div class="bit-compare">
+            <div class="bit-row"><span class="row-label">A 送出的位元</span><div class="bits" id="bitsA"></div></div>
+            <div class="bit-row"><span class="row-label">B 收到的判讀</span><div class="bits" id="bitsB"></div></div>
+          </div>
+          <div class="gnd-result" id="gndResult">✅ 共地時，兩邊的 0V 參考一致，B 能正確判讀每一個位元。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4 -->
+    <section class="slide" data-i="4">
+      <div class="slide-inner">
+        <div class="eyebrow">04 · 封包格式</div>
+        <h2><span class="num latin">04</span>資料封包格式（Frame）</h2>
+        <p class="lede">UART 沒有共同時脈，所以每次傳送 1 個位元組時，都要用固定格式讓對方知道「資料何時開始、何時結束」。下面就是一個完整的傳輸框架，平時線路保持在高電位（閒置）：</p>
+        <div class="frame-row" id="frameRow"></div>
+        <div class="frame-detail" id="frameDetail">👆 點一下上面任一段方塊，看看它的意義。</div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5 -->
+    <section class="slide" data-i="5">
+      <div class="slide-inner">
+        <div class="eyebrow">05 · 鮑率</div>
+        <h2><span class="num latin">05</span>鮑率 Baud Rate</h2>
+        <p class="lede"><b>鮑率（Baud Rate）</b>代表「每秒鐘傳送幾個位元」，單位是 <span class="latin">bps</span>。常見數值有 9600、19200、115200。鮑率愈高，每個位元停留的時間愈短，傳輸愈快，但對線路品質與距離的要求也愈高。<b>最重要的規則：收發兩端的鮑率必須完全一致</b>，否則就像雞同鴨講，資料會全部亂掉！</p>
+        <div class="baud-panel card" style="padding:20px;">
+          <div class="baud-readout">
+            <span class="val latin" id="baudVal">9600</span>
+            <span class="unit latin">bps</span>
+          </div>
+          <input type="range" id="baudSlider" min="0" max="7" step="1" value="3">
+          <div class="baud-marks">
+            <span>300</span><span>1200</span><span>2400</span><span>9600</span><span>19200</span><span>38400</span><span>57600</span><span>115200</span>
+          </div>
+          <div class="pulse-box">
+            <div class="hint">一個位元的持續時間（示意，非實際比例）</div>
+            <div class="pulse-visual" id="pulseVisual"></div>
+          </div>
+          <div class="stat-row">
+            <div class="stat"><div class="k">1 位元時間</div><div class="v" id="statBit">104.2 µs</div></div>
+            <div class="stat"><div class="k">傳送 1 Byte（10 位元框架）</div><div class="v" id="statByte">1.04 ms</div></div>
+            <div class="stat"><div class="k">每秒約可傳送</div><div class="v" id="statThr">960 Bytes</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6 -->
+    <section class="slide" data-i="6">
+      <div class="slide-inner">
+        <div class="eyebrow">06 · 實際模擬</div>
+        <h2><span class="num latin">06</span>完整傳輸模擬</h2>
+        <p class="lede">選一個字元，按下「送出」，看看它會被拆成哪些位元、依照什麼順序被送出去（<b>從最低位元 LSB 開始送</b>）。可以切換下方的同位位元設定，比較偶同位與奇同位的差異。</p>
+        <div class="char-row" id="charRow"></div>
+        <div class="toggle-row" style="flex-wrap:wrap; gap:16px;">
+          <span style="color:var(--muted)">同位位元：</span>
+          <label style="display:flex;align-items:center;gap:6px;"><input type="radio" name="parityMode" value="none" checked> 不使用</label>
+          <label style="display:flex;align-items:center;gap:6px;"><input type="radio" name="parityMode" value="even"> 偶同位 Even</label>
+          <label style="display:flex;align-items:center;gap:6px;"><input type="radio" name="parityMode" value="odd"> 奇同位 Odd</label>
+        </div>
+        <div class="btn-row">
+          <button class="cta" id="sendWave">送出 ▶</button>
+        </div>
+        <div class="wave-wrap">
+          <svg class="wave-svg" id="waveSvg" viewBox="0 0 640 130" preserveAspectRatio="none"></svg>
+          <div class="wave-labels" id="waveLabels"></div>
+        </div>
+        <div class="now-strip" id="nowStrip">尚未送出資料。</div>
+        <div class="ascii-table" id="asciiTable"></div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7 -->
+    <section class="slide" data-i="7">
+      <div class="slide-inner">
+        <div class="eyebrow">07 · 小測驗</div>
+        <div class="quiz-head">
+          <h2><span class="num latin">07</span>重點回顧小測驗</h2>
+          <span class="score-pill" id="scorePill">得分 0 / 4</span>
+        </div>
+        <div id="quizList" style="display:flex;flex-direction:column;gap:12px;"></div>
+        <button class="cta secondary" id="resetQuiz">重新測驗</button>
+      </div>
+    </section>
+
+    <!-- SLIDE 8 -->
+    <section class="slide" data-i="8">
+      <div class="slide-inner">
+        <div class="eyebrow">總結</div>
+        <h2>今天學到了什麼？</h2>
+        <div class="sum-grid">
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b class="latin">TX / RX</b>裝置的傳送腳與接收腳，連接時要交叉接，並共用 GND。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b class="latin">Baud Rate</b>每秒傳送的位元數，兩端必須完全一致才能溝通。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>起始位元</b>固定為 0，像敲門一樣，通知對方資料要開始了。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>同位位元</b>選用的簡單錯誤檢查，讓接收端能發現資料是否可能出錯。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>結束位元</b>固定為 1，讓線路回到閒置狀態，準備下一筆資料。</div></div>
+          <div class="sum-item"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="var(--accent-soft)"/><path d="M5 9l3 3 5-6" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>非同步</b>不需要共用時脈訊號，靠鮑率對齊時間節奏。</div></div>
+        </div>
+        <div class="thanks-note">🔬 <b>動手做做看：</b>下次進實驗室時，試著用示波器或邏輯分析儀量測 UART 訊號，你會看到今天畫的波形真的出現在螢幕上！<br><br>感謝大家的參與，下一堂課我們會實際在 Arduino 上收發 UART 資料 👋</div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn" id="prevBtn" aria-label="上一頁">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="dots" id="dots"></div>
+    <button class="nav-btn" id="nextBtn" aria-label="下一頁">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var TOTAL = 9;
+  var cur = 0;
+  var slidesEl = document.querySelectorAll('.slide');
+  var dotsWrap = document.getElementById('dots');
+  var progressFill = document.getElementById('progressFill');
+  var prevBtn = document.getElementById('prevBtn');
+  var nextBtn = document.getElementById('nextBtn');
+
+  for (var i=0;i<TOTAL;i++){
+    var d = document.createElement('button');
+    d.className = 'dot' + (i===0 ? ' on' : '');
+    d.setAttribute('aria-label','跳到第 '+(i+1)+'頁');
+    d.addEventListener('click', (function(idx){ return function(){ goTo(idx); }; })(i));
+    dotsWrap.appendChild(d);
+  }
+  var dots = dotsWrap.querySelectorAll('.dot');
+
+  function render(prevIdx){
+    slidesEl.forEach(function(s){
+      var idx = parseInt(s.getAttribute('data-i'),10);
+      s.classList.remove('active','leaving-back');
+      if (idx === cur){
+        s.classList.add('active');
+      } else if (prevIdx !== undefined && idx < cur){
+        s.classList.add('leaving-back');
+      }
+    });
+    dots.forEach(function(d,idx){ d.classList.toggle('on', idx===cur); });
+    progressFill.style.width = (((cur+1)/TOTAL)*100)+'%';
+    prevBtn.disabled = cur===0;
+    nextBtn.disabled = cur===TOTAL-1;
+  }
+  function goTo(i){
+    var prevIdx = cur;
+    cur = Math.max(0, Math.min(TOTAL-1, i));
+    render(prevIdx);
+  }
+  prevBtn.addEventListener('click', function(){ goTo(cur-1); });
+  nextBtn.addEventListener('click', function(){ goTo(cur+1); });
+  document.getElementById('startBtn').addEventListener('click', function(){ goTo(1); });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight') goTo(cur+1);
+    if (e.key === 'ArrowLeft') goTo(cur-1);
+  });
+
+  var touchX = null;
+  document.getElementById('slides').addEventListener('touchstart', function(e){ touchX = e.touches[0].clientX; }, {passive:true});
+  document.getElementById('slides').addEventListener('touchend', function(e){
+    if (touchX===null) return;
+    var dx = e.changedTouches[0].clientX - touchX;
+    if (dx > 60) goTo(cur-1);
+    else if (dx < -60) goTo(cur+1);
+    touchX = null;
+  }, {passive:true});
+
+  render();
+
+  /* ---------------- Slide 1 : UART flip letters ---------------- */
+  var letters = [
+    {ch:'U', word:'Universal', sub:'通用', desc:'不限特定廠牌，各種微控制器、模組之間都能用同一套規則溝通。'},
+    {ch:'A', word:'Asynchronous', sub:'非同步', desc:'收發雙方不共用時脈訊號，只靠事先講好的鮑率對齊節奏。'},
+    {ch:'R', word:'Receiver', sub:'接收器 · RX', desc:'負責把外部傳進來的資料收進裝置內部。'},
+    {ch:'T', word:'Transmitter', sub:'傳送器 · TX', desc:'負責把裝置內部的資料送到外部去。'}
+  ];
+  var lettersWrap = document.getElementById('letters');
+  letters.forEach(function(L){
+    var btn = document.createElement('button');
+    btn.className = 'flip-card';
+    btn.innerHTML =
+      '<div class="flip-inner">'+
+        '<div class="flip-face flip-front"><div class="big latin">'+L.ch+'</div><div class="small">'+L.sub+'</div></div>'+
+        '<div class="flip-face flip-back"><div class="word latin">'+L.word+'</div><div class="desc">'+L.desc+'</div></div>'+
+      '</div>';
+    btn.addEventListener('click', function(){ this.classList.toggle('flipped'); });
+    lettersWrap.appendChild(btn);
+  });
+
+  /* ---------------- Slide 2 : TX/RX board ---------------- */
+  var pinInfo = document.getElementById('pinInfo');
+  var pinData = {
+    txA: 'TX（裝置 A）：把資料<b>送出</b>，這條線要接到裝置 B 的 RX。',
+    rxA: 'RX（裝置 A）：<b>接收</b>資料的腳位，接到裝置 B 的 TX。',
+    gndA: 'GND（裝置 A）：共同接地，讓兩邊的電壓判斷基準一致，一定要接！',
+    rxB: 'RX（裝置 B）：<b>接收</b>資料的腳位，接到裝置 A 的 TX。',
+    txB: 'TX（裝置 B）：把資料<b>送出</b>，這條線要接到裝置 A 的 RX。',
+    gndB: 'GND（裝置 B）：共同接地，讓兩邊的電壓判斷基準一致，一定要接！'
+  };
+  document.querySelectorAll('.pin').forEach(function(p){
+    p.addEventListener('click', function(){
+      document.querySelectorAll('.pin').forEach(function(x){ x.classList.remove('active'); });
+      p.classList.add('active');
+      var key = p.getAttribute('data-pin');
+      pinInfo.innerHTML = pinData[key];
+    });
+  });
+  document.getElementById('sendAB').addEventListener('click', function(){
+    var dot = document.getElementById('dotAB');
+    dot.classList.remove('run'); void dot.offsetWidth; dot.classList.add('run');
+    document.getElementById('animAB').beginElement();
+    pinInfo.innerHTML = '📨 資料從 <b>裝置 A 的 TX</b> 沿著線送到 <b>裝置 B 的 RX</b>。';
+  });
+  document.getElementById('sendBA').addEventListener('click', function(){
+    var dot = document.getElementById('dotBA');
+    dot.classList.remove('run'); void dot.offsetWidth; dot.classList.add('run');
+    document.getElementById('animBA').beginElement();
+    pinInfo.innerHTML = '📨 資料從 <b>裝置 B 的 TX</b> 沿著線送到 <b>裝置 A 的 RX</b>。';
+  });
+
+  /* ---------------- Slide 3 : GND demo ---------------- */
+  var gndConnected = true;
+  var gndOriginalBits = [0,1,0,0,0,0,0,1]; // 'A' = 0x41, MSB first, for display
+  var gndCorruptIdx = [2,5]; // fixed bits that get misread once GND is disconnected
+  var bitsAEl = document.getElementById('bitsA');
+  var bitsBEl = document.getElementById('bitsB');
+  var gndResultEl = document.getElementById('gndResult');
+  var gndToggleBtn = document.getElementById('gndToggle');
+  var gndWireEl = document.getElementById('gndWire');
+  var gndSwitchEl = document.getElementById('gndSwitchIcon');
+  var gndBaselineBEl = document.getElementById('gndBaselineB');
+
+  function renderGnd(){
+    bitsAEl.innerHTML = gndOriginalBits.map(function(b){ return '<span class="bit">'+b+'</span>'; }).join('');
+    var display = gndOriginalBits.slice();
+    if (!gndConnected){
+      gndCorruptIdx.forEach(function(i){ display[i] = display[i] ? 0 : 1; });
+    }
+    bitsBEl.innerHTML = display.map(function(b,i){
+      var bad = !gndConnected && gndCorruptIdx.indexOf(i)!==-1;
+      return '<span class="bit'+(bad?' bit-bad':'')+'">'+b+'</span>';
+    }).join('');
+
+    gndWireEl.classList.toggle('broken', !gndConnected);
+    gndSwitchEl.classList.toggle('off', !gndConnected);
+    gndBaselineBEl.classList.toggle('floating', !gndConnected);
+
+    if (gndConnected){
+      gndToggleBtn.innerHTML = '🔌 GND 已連接（點一下模擬斷開）';
+      gndResultEl.innerHTML = '✅ 共地時，兩邊的 0V 參考一致，B 能正確判讀每一個位元。';
+    } else {
+      gndToggleBtn.innerHTML = '⚠️ GND 已斷開（點一下重新連接）';
+      gndResultEl.innerHTML = '❌ 沒有共地時，B 的 0V 參考會漂移不定，量到的電壓忽高忽低，容易把高低電位判讀顛倒——紅色方塊就是被誤判的位元，整個位元組因此變成亂碼。';
+    }
+  }
+  gndToggleBtn.addEventListener('click', function(){
+    gndConnected = !gndConnected;
+    renderGnd();
+  });
+  renderGnd();
+
+  /* ---------------- Slide 4 : frame segments ---------------- */
+  var frame = [
+    {cls:'idle', lvl:'1', lbl:'閒置', tag:'IDLE', color:'var(--muted)', desc:'平時線路保持在高電位（1），代表「目前沒有人在傳資料」，接收端會一直監看這條線，等待電位被拉低。'},
+    {cls:'start', lvl:'0', lbl:'起始位元', tag:'START BIT', color:'var(--coral)', desc:'固定為 <b>0</b>（低電位），像敲門一樣告訴對方「我要開始傳資料囉！」接收端偵測到這個下降緣，就會開始依照鮑率取樣後面的位元。'},
+  ];
+  for (var b=0;b<8;b++){
+    frame.push({cls:'data', lvl:(b%2===0?'1':'0'), lbl:'D'+b, tag:'資料位元 '+b, color:'var(--accent)', desc:'資料位元（Data Bit），通常共有 8 個，代表我們真正想傳送的內容（例如英文字母的 ASCII 碼），並且<b>從最低位元 D0（LSB）開始送起</b>。'});
+  }
+  frame.push({cls:'parity', lvl:'P', lbl:'同位位元', tag:'PARITY（選用）', color:'var(--amber)', desc:'選用的簡單錯誤檢查機制。以<b>偶同位（Even）</b>為例：整個「資料位元 + 同位位元」中 1 的個數要是偶數；<b>奇同位（Odd）</b>則要是奇數。若接收端算出來的結果不符，就代表資料可能在傳輸中出錯了。'});
+  frame.push({cls:'stop', lvl:'1', lbl:'結束位元', tag:'STOP BIT', color:'var(--coral)', desc:'固定為 <b>1</b>（高電位），讓線路回到閒置狀態，同時也給接收端一點緩衝時間，準備接收下一筆資料。通常是 1 或 2 個位元。'});
+  frame.push({cls:'idle', lvl:'1', lbl:'閒置', tag:'IDLE', color:'var(--muted)', desc:'一個框架送完後，線路又回到高電位的閒置狀態，等待下一次的起始位元出現。'});
+
+  var frameRow = document.getElementById('frameRow');
+  var frameDetail = document.getElementById('frameDetail');
+  frame.forEach(function(seg, idx){
+    var d = document.createElement('div');
+    d.className = 'seg '+seg.cls;
+    d.tabIndex = 0;
+    d.innerHTML = '<div class="lvl mono">'+seg.lvl+'</div><div class="lbl">'+seg.lbl+'</div>';
+    d.addEventListener('click', function(){
+      document.querySelectorAll('.seg').forEach(function(x){ x.classList.remove('selected'); });
+      d.classList.add('selected');
+      frameDetail.innerHTML = '<span class="tag" style="background:'+seg.color+';color:var(--surface)">'+seg.tag+'</span><br>'+seg.desc;
+    });
+    frameRow.appendChild(d);
+  });
+
+  /* ---------------- Slide 4 : baud rate ---------------- */
+  var bauds = [300,1200,2400,9600,19200,38400,57600,115200];
+  var slider = document.getElementById('baudSlider');
+  var baudVal = document.getElementById('baudVal');
+  var pulseVisual = document.getElementById('pulseVisual');
+  var statBit = document.getElementById('statBit');
+  var statByte = document.getElementById('statByte');
+  var statThr = document.getElementById('statThr');
+
+  function fmtMicro(us){
+    if (us >= 1000) return (us/1000).toFixed(2)+' ms';
+    return us.toFixed(1)+' µs';
+  }
+  function updateBaud(){
+    var baud = bauds[parseInt(slider.value,10)];
+    baudVal.textContent = baud;
+    var bitUs = 1e6/baud;
+    var byteUs = bitUs*10;
+    statBit.textContent = fmtMicro(bitUs);
+    statByte.textContent = fmtMicro(byteUs);
+    statThr.textContent = Math.round(baud/10)+' Bytes';
+    var animMs = Math.max(120, Math.min(1400, 300000/baud));
+    pulseVisual.style.animation = 'blinkPulse '+animMs+'ms steps(2,end) infinite';
+  }
+  var styleTag = document.createElement('style');
+  styleTag.textContent = '@keyframes blinkPulse{0%,100%{opacity:1}50%{opacity:.25}}';
+  document.head.appendChild(styleTag);
+  slider.addEventListener('input', updateBaud);
+  updateBaud();
+
+  /* ---------------- Slide 5 : full simulate ---------------- */
+  var chars = ['A','H','i','?','z'];
+  var charRow = document.getElementById('charRow');
+  var selectedChar = 'A';
+  var asciiTable = document.getElementById('asciiTable');
+  var parityRadios = document.querySelectorAll('input[name="parityMode"]');
+  var nowStrip = document.getElementById('nowStrip');
+
+  function getParityMode(){
+    var checked = document.querySelector('input[name="parityMode"]:checked');
+    return checked ? checked.value : 'none';
+  }
+
+  function refreshAsciiTable(){
+    var code = selectedChar.charCodeAt(0) & 0xFF;
+    var bin = code.toString(2).padStart(8,'0');
+    var hex = code.toString(16).toUpperCase().padStart(2,'0');
+    asciiTable.innerHTML =
+      '<div>字元：<b>'+selectedChar+'</b></div>'+
+      '<div>十進位 Decimal：<b>'+code+'</b></div>'+
+      '<div>十六進位 Hex：<b>0x'+hex+'</b></div>'+
+      '<div>二進位（MSB→LSB）：<b>'+bin+'</b></div>';
+  }
+  chars.forEach(function(c){
+    var b = document.createElement('button');
+    b.className = 'char-btn latin'+(c===selectedChar?' sel':'');
+    b.textContent = c;
+    b.addEventListener('click', function(){
+      selectedChar = c;
+      document.querySelectorAll('.char-btn').forEach(function(x){ x.classList.remove('sel'); });
+      b.classList.add('sel');
+      refreshAsciiTable();
+      if (waveTimer){ clearInterval(waveTimer); waveTimer = null; }
+      drawWave(buildBits());
+      nowStrip.innerHTML = '已載入字元 <b class="latin">'+selectedChar+'</b> 的波形，按下「送出」開始逐位元播放。';
+    });
+    charRow.appendChild(b);
+  });
+  refreshAsciiTable();
+
+  var waveSvg = document.getElementById('waveSvg');
+  var waveLabels = document.getElementById('waveLabels');
+  var waveTimer = null;
+
+  function buildBits(){
+    var code = selectedChar.charCodeAt(0) & 0xFF;
+    var dbits = [];
+    for (var i=0;i<8;i++){ dbits.push((code>>i)&1); } // LSB first
+    var bits = [{v:1,l:'閒置'},{v:0,l:'START'}];
+    dbits.forEach(function(v,i){ bits.push({v:v, l:'D'+i}); });
+    var parityMode = getParityMode();
+    if (parityMode !== 'none'){
+      var ones = dbits.reduce(function(a,b){return a+b;},0);
+      var p;
+      if (parityMode === 'even'){
+        p = ones % 2 === 0 ? 0 : 1; // total 1s (data+parity) must be even
+      } else {
+        p = ones % 2 === 0 ? 1 : 0; // odd: total 1s (data+parity) must be odd
+      }
+      bits.push({v:p, l:'PAR'});
+    }
+    bits.push({v:1,l:'STOP'});
+    bits.push({v:1,l:'閒置'});
+    return bits;
+  }
+
+  function drawWave(bits, highlightIdx){
+    var w = 640, h = 130, unit = w/bits.length;
+    var high = 30, low = 96;
+    var d = '';
+    for (var i=0;i<bits.length;i++){
+      var x0 = i*unit, x1 = (i+1)*unit;
+      var y = bits[i].v ? high : low;
+      d += (i===0 ? 'M'+x0+' '+y : 'L'+x0+' '+y) + ' L'+x1+' '+y;
+      if (i<bits.length-1){
+        var yNext = bits[i+1].v ? high : low;
+        if (yNext !== y) d += ' L'+x1+' '+yNext;
+      }
+    }
+    var svgParts = [
+      '<line x1="0" y1="'+high+'" x2="'+w+'" y2="'+high+'" stroke="var(--line)" stroke-dasharray="2 4"/>',
+      '<line x1="0" y1="'+low+'" x2="'+w+'" y2="'+low+'" stroke="var(--line)" stroke-dasharray="2 4"/>'
+    ];
+    for (var s=1;s<bits.length;s++){
+      var sx = s*unit;
+      svgParts.push('<line x1="'+sx+'" y1="4" x2="'+sx+'" y2="'+(h-4)+'" stroke="var(--muted)" stroke-opacity="0.35" stroke-dasharray="3 4"/>');
+    }
+    svgParts.push(
+      '<path class="wave-line" d="'+d+'"/>',
+      '<text x="4" y="'+(high-8)+'" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">1</text>',
+      '<text x="4" y="'+(low+16)+'" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--muted)">0</text>'
+    );
+    if (highlightIdx!==undefined && highlightIdx!==null){
+      var mx = highlightIdx*unit;
+      var fontSize = Math.min(unit,h)*0.5;
+      svgParts.push('<rect class="wave-mask" x="'+mx+'" y="0" width="'+unit+'" height="'+h+'"/>');
+      svgParts.push('<text class="wave-mask-text" x="'+(mx+unit/2)+'" y="'+(h/2)+'" text-anchor="middle" dominant-baseline="central" font-family="JetBrains Mono, monospace" font-size="'+fontSize+'">'+bits[highlightIdx].v+'</text>');
+    }
+    waveSvg.innerHTML = svgParts.join('');
+    waveSvg.setAttribute('viewBox','0 0 '+w+' '+h);
+
+    waveLabels.innerHTML = bits.map(function(b,i){
+      return '<span style="'+(i===highlightIdx?'color:var(--coral);font-weight:700':'')+'">'+b.l+'</span>';
+    }).join('');
+  }
+
+  function labelFor(l){
+    if (l==='閒置') return '線路閒置，保持高電位';
+    if (l==='START') return '<b>起始位元</b>：拉低電位，通知接收端資料要開始了';
+    if (l==='PAR') return '<b>同位位元</b>：用來做簡單的錯誤檢查';
+    if (l==='STOP') return '<b>結束位元</b>：拉回高電位，這個框架送完了';
+    return '<b>資料位元 '+l+'</b>：組成字元 ASCII 碼的其中一個位元';
+  }
+
+  function playWave(){
+    if (waveTimer) clearInterval(waveTimer);
+    var bits = buildBits();
+    var idx = 0;
+    drawWave(bits, 0);
+    nowStrip.innerHTML = '目前：'+labelFor(bits[0].l)+'　（電位 = '+bits[0].v+'）';
+    waveTimer = setInterval(function(){
+      idx++;
+      if (idx >= bits.length){
+        clearInterval(waveTimer);
+        drawWave(bits);
+        nowStrip.innerHTML = '✅ 已送出字元 <b class="latin">'+selectedChar+'</b> 的完整框架！';
+        return;
+      }
+      drawWave(bits, idx);
+      nowStrip.innerHTML = '目前：'+labelFor(bits[idx].l)+'　（電位 = '+bits[idx].v+'）';
+    }, 420);
+  }
+  drawWave(buildBits());
+  document.getElementById('sendWave').addEventListener('click', playWave);
+  parityRadios.forEach(function(r){
+    r.addEventListener('change', function(){
+      if (waveTimer){ clearInterval(waveTimer); waveTimer = null; }
+      drawWave(buildBits());
+    });
+  });
+
+  /* ---------------- Slide 6 : quiz ---------------- */
+  var quiz = [
+    {
+      q: '裝置 A 想把資料傳給裝置 B，應該用哪一條線？',
+      opts: ['A 的 TX 接到 B 的 RX', 'A 的 TX 接到 B 的 TX', 'A 的 RX 接到 B 的 RX'],
+      correct: 0,
+      explain: 'TX 是「送出」，RX 是「接收」，所以 A 要用自己的 TX 接到 B 的 RX，資料才送得進去。'
+    },
+    {
+      q: '如果收發兩端的鮑率設定不一樣，會發生什麼事？',
+      opts: ['完全沒有影響', '傳輸速度會自動調整成一致', '資料會被錯誤解讀，變成亂碼'],
+      correct: 2,
+      explain: '鮑率決定了取樣時間點，兩端不一致時，接收端會在錯誤的時間點讀取電位，導致資料錯亂。'
+    },
+    {
+      q: '起始位元（Start Bit）的電位固定是多少？',
+      opts: ['固定是 1（高電位）', '固定是 0（低電位）', '可以是 0 或 1'],
+      correct: 1,
+      explain: '線路閒置時是高電位，起始位元把電位拉低（0），像敲門一樣通知對方要開始傳資料了。'
+    },
+    {
+      q: '同位位元（Parity Bit）的主要用途是什麼？',
+      opts: ['加快傳輸速度', '簡單檢查資料傳輸是否有錯誤', '決定鮑率大小'],
+      correct: 1,
+      explain: '同位位元是選用的錯誤檢查機制，用 1 的個數是奇數還是偶數來初步判斷資料是否可能出錯。'
+    }
+  ];
+  var quizList = document.getElementById('quizList');
+  var scorePill = document.getElementById('scorePill');
+  var score = 0;
+  var answered = 0;
+
+  function buildQuiz(){
+    quizList.innerHTML = '';
+    score = 0; answered = 0;
+    scorePill.textContent = '得分 0 / '+quiz.length;
+    quiz.forEach(function(item, qi){
+      var card = document.createElement('div');
+      card.className = 'q-card';
+      var optsHtml = item.opts.map(function(o,oi){
+        return '<button class="opt" data-oi="'+oi+'">'+o+'</button>';
+      }).join('');
+      card.innerHTML = '<div class="q-title">Q'+(qi+1)+'. '+item.q+'</div>'+
+        '<div class="opts">'+optsHtml+'</div>'+
+        '<div class="q-explain">💡 '+item.explain+'</div>';
+      var explainEl = card.querySelector('.q-explain');
+      card.querySelectorAll('.opt').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          if (card.dataset.locked) return;
+          card.dataset.locked = '1';
+          var oi = parseInt(btn.getAttribute('data-oi'),10);
+          card.querySelectorAll('.opt').forEach(function(o,i){
+            o.disabled = true;
+            if (i === item.correct) o.classList.add('correct');
+            else if (i === oi) o.classList.add('wrong');
+          });
+          if (oi === item.correct) score++;
+          answered++;
+          explainEl.classList.add('show');
+          scorePill.textContent = '得分 '+score+' / '+quiz.length;
+        });
+      });
+      quizList.appendChild(card);
+    });
+  }
+  buildQuiz();
+  document.getElementById('resetQuiz').addEventListener('click', buildQuiz);
+
+})();
+</script>
